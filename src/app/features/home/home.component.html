@@ -1,0 +1,183 @@
+<div class="app-wrapper">
+  <!-- Mobile overlay -->
+  <div class="sidebar-overlay" [class.active]="sidebarOpen()" (click)="closeSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" [class.open]="sidebarOpen()">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <span class="material-symbols-outlined">videocam</span>
+      </div>
+      <div class="logo-text">
+        <h1>VideoConnect</h1>
+        <p>Enterprise</p>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a
+        *ngFor="let item of navItems"
+        href="#"
+        class="nav-item"
+        [class.active]="item.active"
+        (click)="closeSidebar()"
+      >
+        <span class="material-symbols-outlined">{{ item.icon }}</span>
+        <span>{{ item.label }}</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="storage-card">
+        <p class="storage-label">Storage</p>
+        <div class="storage-bar">
+          <div class="storage-fill"></div>
+        </div>
+        <p class="storage-info">7.5GB of 10GB used</p>
+      </div>
+      <button class="upgrade-btn">
+        <span class="material-symbols-outlined">upgrade</span>
+        Upgrade
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+    <!-- Header -->
+    <header class="app-header">
+      <button class="hamburger" (click)="toggleSidebar()">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+
+      <div class="search-wrapper">
+        <span class="material-symbols-outlined search-icon">search</span>
+        <input type="text" class="search-input" placeholder="Search meetings, contacts..." />
+      </div>
+
+      <div class="header-actions">
+        <button class="icon-btn notif-btn">
+          <span class="material-symbols-outlined">notifications</span>
+          <span class="notif-dot"></span>
+        </button>
+        <button class="icon-btn">
+          <span class="material-symbols-outlined">settings</span>
+        </button>
+        <div class="divider"></div>
+        <div class="user-info">
+          <div class="user-text">
+            <p class="user-name">Alex Rivers</p>
+            <p class="user-role">Administrator</p>
+          </div>
+          <img
+            class="avatar"
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1aRgCTeGrTf0M9gDA2uvR3VxB85d_SZ9HB_81FVZp6U-aoZVzmhZHEIxUpbyEZ4QvZAxekq7RrasZGgPgO2iLx9otT2eWbY55fSE8e9bBy_MA8rB37rF6xfYkZ21ssQ7gqSiYGJoY-oiRriqOS4Z7iVBeQTiqiDmsAA0RqA6Pdari5tcfgwpYUJDBtA_pDGwaqAA6IzMvEpgiKlAwxAWKBf3wHQj49lgzV_69swNT5YQK_XAGqKs6r3_PuY4ZVls8Lte2YXSIXeI"
+            alt="Alex Rivers"
+          />
+        </div>
+      </div>
+    </header>
+
+    <!-- Page content -->
+    <div class="page-content">
+      <div class="content-grid">
+        <!-- Left column -->
+        <div class="left-col">
+          <!-- Welcome -->
+          <div class="welcome-section">
+            <h2 class="welcome-title">Welcome back, Alex!</h2>
+            <p class="welcome-sub">You have 3 meetings scheduled for today.</p>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="action-buttons">
+            <button
+              *ngFor="let btn of actionButtons"
+              class="action-btn"
+              [class.orange]="btn.color === 'orange'"
+              [class.primary]="btn.color === 'primary'"
+              (click)="handleAction(btn)"
+            >
+              <div class="action-icon-wrap">
+                <span class="material-symbols-outlined">{{ btn.icon }}</span>
+              </div>
+              <span class="action-label">{{ btn.label }}</span>
+            </button>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="quick-actions-card">
+            <div class="card-header">
+              <h3 class="card-title">Quick Actions</h3>
+              <button class="view-all-btn">View all</button>
+            </div>
+            <div class="qa-grid">
+              <div
+                *ngFor="let qa of quickActions"
+                class="qa-item"
+                [class.green]="qa.bg === 'green'"
+                [class.purple]="qa.bg === 'purple'"
+              >
+                <div class="qa-icon">
+                  <span class="material-symbols-outlined">{{ qa.icon }}</span>
+                </div>
+                <div>
+                  <p class="qa-label">{{ qa.label }}</p>
+                  <p class="qa-sub">{{ qa.sub }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right column -->
+        <div class="right-col">
+          <!-- Upcoming Meetings -->
+          <div class="meetings-card">
+            <div class="meetings-header">
+              <h3 class="card-title">Upcoming Meetings</h3>
+              <span class="material-symbols-outlined more-icon">more_horiz</span>
+            </div>
+            <div class="meetings-list">
+              <div *ngFor="let m of meetings" class="meeting-item" [class.dimmed]="!m.active && !m.action">
+                <div class="meeting-date" [class.active]="m.active">
+                  <span class="date-month">{{ m.month }}</span>
+                  <span class="date-day">{{ m.day }}</span>
+                </div>
+                <div class="meeting-info">
+                  <h4 class="meeting-title">{{ m.title }}</h4>
+                  <p class="meeting-time">{{ m.time }}</p>
+                  <div class="meeting-avatars" *ngIf="m.avatars.length > 0">
+                    <div class="avatar-stack">
+                      <img *ngFor="let av of m.avatars" [src]="av" class="meeting-avatar" alt="Team member" />
+                      <div *ngIf="m.extra" class="avatar-extra">{{ m.extra }}</div>
+                    </div>
+                  </div>
+                </div>
+                <button *ngIf="m.action" class="meeting-action-btn"
+                  [class.primary-btn]="m.active"
+                  [class.outline-btn]="!m.active"
+                  (click)="router.navigate(['/waiting-room'], { queryParams: { title: m.title } })">
+                  {{ m.action }}
+                </button>
+              </div>
+            </div>
+            <button class="see-schedule-btn">See full schedule</button>
+          </div>
+
+          <!-- Cloud Storage promo -->
+          <div class="promo-card">
+            <div class="promo-content">
+              <h4 class="promo-title">Cloud Storage Full?</h4>
+              <p class="promo-sub">Upgrade to Business to get unlimited recording storage and 4K quality.</p>
+              <button class="promo-btn">Learn More</button>
+            </div>
+            <div class="promo-bg-icon">
+              <span class="material-symbols-outlined">cloud_upload</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

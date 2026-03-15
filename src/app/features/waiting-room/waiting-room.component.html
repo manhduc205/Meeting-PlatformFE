@@ -1,0 +1,195 @@
+<div class="wr-wrapper">
+
+  <!-- Background blobs -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+
+  <!-- ===== HEADER ===== -->
+  <header class="wr-header">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <span class="material-symbols-outlined">videocam</span>
+      </div>
+      <span class="brand-name">VideoConnect</span>
+    </div>
+    <div class="header-actions">
+      <button class="hdr-btn" title="Settings">
+        <span class="material-symbols-outlined">settings</span>
+      </button>
+      <button class="hdr-btn" title="Help">
+        <span class="material-symbols-outlined">help</span>
+      </button>
+      <div class="hdr-divider"></div>
+      <div class="hdr-avatar"
+           style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB_mLGiLMNACHCFzbVOrj16IYN2lY2WQGd-mBQtwBDp3_nCcOkTBLK6xRjkEapzaixtCymO-tDmEfFW20Mama86XKbT7BmSD0pAKnwn4dB_WnhaFuk4qQmgrfnje1znEBnDopOC7GVIQXgO-GQVzS00vj2-zA5GPRKrMwQnFt_dmWWewJgmAB4oMfFSXx22PIkqfQIsyGdMyIYos_UjafT0Lr19gY8YPrnwdZU0SaobrbW9_YiSFbR-xcNCV4yufy-iO7_TPfB18IU')">
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="wr-main">
+    <div class="wr-grid">
+
+      <!-- ─── LEFT: Video preview ─── -->
+      <div class="left-col">
+        <div class="join-heading">
+          <h1>Ready to join?</h1>
+          <p>Check your camera and microphone settings before entering the call.</p>
+        </div>
+
+        <!-- Video preview -->
+        <div class="video-preview">
+          <!-- Camera feed / placeholder -->
+          <div class="video-feed" [class.cam-off]="!camOn()">
+            <img
+              *ngIf="camOn()"
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsnG69TJ28oKNPn2fHvGyWL7ksr6Dm43We8MebqNF2tUEy5LTatFshiMXQUeS5bgoeG1gbeNZXLyJdykfeR-gqalhwLFsDLyYE5UEoiW1wq_vyFSSEUcCuY91MkGRbGac2sHtt83AeCIP8UF041Ppwsd1of-WQ76kACh8gKEYsZXUX4-Dvxhh3Cs0ns6A0NEzB6Lpa6LtWh-RY-okzXkL5asdNSKDHYJiwKshC-POtD-VyrBnHTYp48L0FaKUfgHze-LmQnc62Jrs'"
+              alt="Camera preview"
+              class="feed-img"
+            />
+            <div *ngIf="!camOn()" class="cam-off-placeholder">
+              <span class="material-symbols-outlined">videocam_off</span>
+              <span>Camera is off</span>
+            </div>
+          </div>
+
+          <!-- Mic level indicator -->
+          <div class="mic-indicator" [class.muted]="!micOn()">
+            <div class="mic-bars" *ngIf="micOn()">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <span class="material-symbols-outlined mic-off-icon" *ngIf="!micOn()">mic_off</span>
+            <span class="mic-label">{{ micOn() ? 'Audio Active' : 'Muted' }}</span>
+          </div>
+
+          <!-- Controls bar -->
+          <div class="controls-bar">
+            <button
+              class="ctrl-btn"
+              [class.active]="micOn()"
+              [class.off]="!micOn()"
+              (click)="toggleMic()"
+              [title]="micOn() ? 'Mute microphone' : 'Unmute microphone'"
+            >
+              <span class="material-symbols-outlined">{{ micOn() ? 'mic' : 'mic_off' }}</span>
+            </button>
+            <button
+              class="ctrl-btn"
+              [class.active]="camOn()"
+              [class.off]="!camOn()"
+              (click)="toggleCam()"
+              [title]="camOn() ? 'Turn off camera' : 'Turn on camera'"
+            >
+              <span class="material-symbols-outlined">{{ camOn() ? 'videocam' : 'videocam_off' }}</span>
+            </button>
+            <div class="ctrl-sep"></div>
+            <button class="ctrl-btn ghost" title="More options">
+              <span class="material-symbols-outlined">more_horiz</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Device selectors -->
+        <div class="device-selectors">
+          <div class="device-select-group">
+            <label>Microphone</label>
+            <div class="select-wrap">
+              <span class="material-symbols-outlined sel-icon">mic</span>
+              <select [(ngModel)]="selectedMic" name="mic">
+                <option *ngFor="let m of microphones" [value]="m">{{ m }}</option>
+              </select>
+              <span class="material-symbols-outlined chevron">expand_more</span>
+            </div>
+          </div>
+          <div class="device-select-group">
+            <label>Camera</label>
+            <div class="select-wrap">
+              <span class="material-symbols-outlined sel-icon">videocam</span>
+              <select [(ngModel)]="selectedCamera" name="cam">
+                <option *ngFor="let c of cameras" [value]="c">{{ c }}</option>
+              </select>
+              <span class="material-symbols-outlined chevron">expand_more</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── RIGHT: Meeting card ─── -->
+      <div class="right-col">
+        <div class="meeting-card">
+          <div class="card-body">
+
+            <!-- Status badge -->
+            <div class="meeting-badge">
+              <span class="badge-dot">
+                <span class="ping"></span>
+              </span>
+              Meeting in progress
+            </div>
+
+            <h2 class="meeting-title">{{ meetingTitle() }}</h2>
+            <div class="meeting-time">
+              <span class="material-symbols-outlined">calendar_today</span>
+              <span>{{ meetingTime() }}</span>
+            </div>
+
+            <!-- Participants -->
+            <div class="participants-section">
+              <p class="section-label">Participants ({{ participantCount() }})</p>
+              <div class="avatar-stack">
+                <img *ngFor="let p of participants" [src]="p" alt="Participant" class="p-avatar" />
+                <div class="p-avatar extra">+{{ participantCount() - participants.length }}</div>
+              </div>
+              <p class="participant-names">Alex, Sarah, and {{ participantCount() - 2 }} others are already here</p>
+            </div>
+
+            <!-- Info banner -->
+            <div class="info-banner">
+              <span class="material-symbols-outlined info-icon">info</span>
+              <div>
+                <p class="info-title">Joining from another device?</p>
+                <p class="info-sub">Audio will be muted to prevent echo if you're joining multiple times.</p>
+              </div>
+            </div>
+
+            <!-- CTA buttons -->
+            <div class="cta-section">
+              <button class="btn-join" (click)="joinNow()" [class.loading]="isJoining()">
+                <ng-container *ngIf="!isJoining()">
+                  Join Now
+                  <span class="material-symbols-outlined">login</span>
+                </ng-container>
+                <ng-container *ngIf="isJoining()">
+                  <span class="spinner"></span> Joining...
+                </ng-container>
+              </button>
+              <button class="btn-later">Schedule for Later</button>
+            </div>
+          </div>
+
+          <!-- Card footer -->
+          <div class="card-footer">
+            <span class="meeting-id">Meeting ID: {{ meetingId() }}</span>
+            <button class="copy-btn" (click)="copyLink()">
+              <span class="material-symbols-outlined">{{ copied() ? 'check' : 'content_copy' }}</span>
+              {{ copied() ? 'Copied!' : 'Copy Link' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Connection status row -->
+        <div class="status-row">
+          <div class="conn-status">
+            <span class="conn-dot"></span>
+            <span>Connection: Excellent</span>
+          </div>
+          <button class="test-audio-btn">
+            <span class="material-symbols-outlined">speaker</span>
+            Test Audio &amp; Speakers
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
