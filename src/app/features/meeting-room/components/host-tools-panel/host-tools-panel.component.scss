@@ -1,0 +1,493 @@
+// ===== Host Tools Panel (Dark Theme, Glassmorphism) =====
+.host-tools-panel {
+  position: fixed;
+  bottom: 100px;
+  left: calc(50% + 130px);
+  transform: translateX(-50%);
+  width: 288px; // w-72
+  background: rgba(30, 33, 39, 0.95); // bg-[#1e2127]/95
+  backdrop-filter: blur(24px); // backdrop-blur-2xl
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px; // rounded-2xl
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6); // shadow-2xl shadow-black/60
+  overflow: hidden;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+
+  // Animation mimicking motion.div
+  animation: htpFadeIn 0.18s ease-out forwards;
+}
+
+@keyframes htpFadeIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 16px) scale(0.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+// Header
+.htp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px; // py-3 px-4
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.htp-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .htp-icon-bg {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.2); // bg-blue-500/20
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .htp-icon-blue {
+    color: #60a5fa;
+    display: block;
+  }
+}
+
+.htp-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.htp-close-btn {
+  padding: 4px;
+  border-radius: 8px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+
+  &:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  svg {
+    display: block;
+  }
+}
+
+// Section
+.htp-section {
+  padding: 8px;
+  animation: htpSlideMain 0.15s ease-out forwards;
+}
+
+@keyframes htpSlideMain {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.htp-section-title {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em; // tracking-wider
+  padding: 6px 8px;
+  margin: 0;
+
+  &.mt-1 {
+    margin-top: 4px;
+  }
+
+  &.px-4 {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  &.pb-2 {
+    padding-bottom: 8px;
+  }
+}
+
+// Toggle Row
+.htp-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  &.active {
+    background: rgba(59, 130, 246, 0.1); // bg-blue-500/10
+
+    &:hover {
+      background: rgba(59, 130, 246, 0.15);
+    }
+  }
+
+  .htp-row-icon {
+    padding: 6px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.6);
+    transition: all 0.15s;
+
+    svg {
+      display: block;
+    }
+
+    &.active {
+      background: rgba(59, 130, 246, 0.2); // bg-blue-500/20
+      color: #60a5fa; // text-blue-400
+    }
+
+    .htp-amber {
+      color: #fbbf24;
+    }
+
+    // text-amber-400
+  }
+
+  &:hover:not(.active) .htp-row-icon {
+    color: #fff;
+  }
+
+  .htp-row-text {
+    flex: 1;
+    min-width: 0;
+
+    .htp-row-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
+      margin: 0;
+
+      &.active {
+        color: #93c5fd;
+      }
+
+      // text-blue-300
+    }
+
+    .htp-row-desc {
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.35);
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .htp-toggle {
+    width: 32px;
+    height: 16px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    padding: 2px;
+    transition: background 0.2s;
+    flex-shrink: 0;
+
+    &.on {
+      background: #3b82f6; // bg-blue-500
+      justify-content: flex-end;
+    }
+
+    .htp-toggle-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+  }
+}
+
+// Nav Buttons (Spotlight / Remove)
+.htp-nav-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .htp-nav-icon {
+    padding: 6px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.6);
+    transition: all 0.15s;
+
+    svg {
+      display: block;
+    }
+  }
+
+  &:hover .htp-nav-icon {
+    color: #fff;
+  }
+
+  .htp-nav-text {
+    flex: 1;
+    min-width: 0;
+
+    .htp-nav-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
+      margin: 0;
+    }
+
+    .htp-nav-sub {
+      font-size: 11px;
+      color: #60a5fa; // blue-400
+      margin: 0;
+    }
+  }
+
+  .htp-chevron {
+    color: rgba(255, 255, 255, 0.3);
+    transition: color 0.15s;
+  }
+
+  &:hover .htp-chevron {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  // Red variant
+  &.htp-nav-red {
+    &:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    // hover:bg-red-500/10
+
+    .htp-nav-icon-red {
+      padding: 6px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.6);
+      transition: all 0.15s;
+
+      svg {
+        display: block;
+      }
+    }
+
+    &:hover .htp-nav-icon-red {
+      color: #f87171;
+    }
+
+    // text-red-400
+
+    .htp-nav-label-red {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
+      margin: 0;
+      transition: color 0.15s;
+    }
+
+    &:hover .htp-nav-label-red {
+      color: #fca5a5;
+    }
+
+    // text-red-300
+
+    .htp-chevron-red {
+      color: rgba(255, 255, 255, 0.3);
+      transition: color 0.15s;
+    }
+
+    &:hover .htp-chevron-red {
+      color: #f87171;
+    }
+  }
+}
+
+// End Meeting Footer
+.htp-end-wrap {
+  padding: 8px 8px 4px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 8px; // mt-2
+}
+
+.htp-end-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.1); // bg-red-500/10
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #f87171; // text-red-400
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  svg {
+    display: block;
+  }
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5; // text-red-300
+  }
+}
+
+
+// Lists (Spotlight/Remove sections)
+.htp-list-section {
+  padding: 8px 0;
+  animation: htpSlideList 0.15s ease-out forwards;
+}
+
+@keyframes htpSlideList {
+  0% {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.htp-list-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px; // px-4 py-2
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: left;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .htp-icon-dim {
+    color: rgba(255, 255, 255, 0.5);
+    display: block;
+  }
+
+  .htp-list-text-dim {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+  }
+
+  .htp-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .htp-flex-1 {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .htp-list-name {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.85);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s;
+  }
+
+  .htp-crown {
+    color: #facc15;
+    display: block;
+  }
+
+  // yellow-400
+  .htp-icon-blue {
+    color: #60a5fa;
+    display: block;
+  }
+
+  // blue-400
+
+  // Red hover logic for remove list
+  &.htp-list-group-red {
+    &:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    // hover:bg-red-500/10
+
+    .group-hover-red {
+      transition: color 0.15s;
+    }
+
+    &:hover .group-hover-red {
+      color: #fca5a5;
+    }
+
+    // hover:text-red-300
+
+    .htp-icon-red-hover {
+      color: rgba(255, 255, 255, 0.2);
+      transition: color 0.15s;
+      display: block;
+    }
+
+    &:hover .htp-icon-red-hover {
+      color: #f87171;
+    }
+
+    // hover:text-red-400
+  }
+}

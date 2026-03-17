@@ -1,0 +1,167 @@
+<!-- We are inside the HomeComponent's page-content wrapper -->
+<div class="rd-body">
+
+  <!-- Center: video player + reactions + transcript -->
+  <div class="rd-center">
+
+    <!-- Video title bar -->
+    <div class="rd-video-header">
+      <div class="rd-video-title-section">
+        <button class="rd-back-btn" (click)="goBack()">
+          <span class="material-symbols-outlined">arrow_back</span>
+        </button>
+        <div>
+          <div class="rd-title-row">
+            <h1 class="rd-title">{{ recording.title }}</h1>
+            <button class="rd-star-btn" (click)="toggleStar()">
+              <span class="material-symbols-outlined" [class.filled]="isStarred()">star</span>
+            </button>
+          </div>
+          <div class="rd-title-meta">
+            <span class="rd-meta-author">{{ recording.creator }}</span>
+            <span class="rd-meta-dot">•</span>
+            <span class="rd-meta-time">{{ recording.createdAt }}</span>
+            <span class="rd-meta-dot">•</span>
+            <div class="rd-meta-views">
+              <span class="material-symbols-outlined rd-views-icon">visibility</span>
+              <span>{{ recording.views }} views</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rd-title-actions">
+        <button class="rd-share-btn">
+          <span class="material-symbols-outlined">share</span>
+          Share
+        </button>
+        <button class="rd-icon-action-btn">
+          <span class="material-symbols-outlined">link</span>
+        </button>
+        <button class="rd-icon-action-btn">
+          <span class="material-symbols-outlined">edit</span>
+        </button>
+        <button class="rd-icon-action-btn">
+          <span class="material-symbols-outlined">settings</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Video Player -->
+    <div class="rd-player">
+      <img [src]="recording.thumbnailUrl" [alt]="recording.title" class="rd-player-bg" />
+      <div class="rd-player-overlay">
+        <!-- Play button -->
+        <button class="rd-play-circle" (click)="togglePlay()">
+          <span class="material-symbols-outlined rd-play-icon">
+            {{ isPlaying() ? 'pause' : 'play_arrow' }}
+          </span>
+        </button>
+
+        <!-- Player controls -->
+        <div class="rd-player-controls">
+          <!-- Progress bar -->
+          <div class="rd-progress-track">
+            <div class="rd-progress-fill" [style.width.%]="progressPct()">
+              <div class="rd-progress-thumb"></div>
+            </div>
+          </div>
+
+          <div class="rd-controls-row">
+            <div class="rd-controls-left">
+              <button class="rd-ctrl-btn" (click)="togglePlay()">
+                <span class="material-symbols-outlined">{{ isPlaying() ? 'pause' : 'play_arrow' }}</span>
+              </button>
+              <div class="rd-ctrl-volume">
+                <button class="rd-ctrl-btn">
+                  <span class="material-symbols-outlined">volume_up</span>
+                </button>
+                <span class="rd-time-label">{{ recording.currentTime }} / {{ recording.duration }}</span>
+              </div>
+            </div>
+            <div class="rd-controls-right">
+              <button class="rd-speed-btn">1x</button>
+              <button class="rd-ctrl-btn">
+                <span class="material-symbols-outlined">settings</span>
+              </button>
+              <button class="rd-ctrl-btn">
+                <span class="material-symbols-outlined">fullscreen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reactions bar -->
+    <div class="rd-reactions">
+      <div class="rd-reaction-bar">
+        <button
+          *ngFor="let emoji of reactions"
+          class="rd-emoji-btn"
+          [title]="emoji"
+        >{{ emoji }}</button>
+        <div class="rd-reaction-divider"></div>
+        <button class="rd-comment-btn">
+          <span class="material-symbols-outlined">add_comment</span>
+          Comment
+        </button>
+      </div>
+    </div>
+
+    <!-- Transcript -->
+    <div class="rd-transcript">
+      <h3 class="rd-transcript-title">Transcript &amp; Notes</h3>
+      <div class="rd-transcript-list">
+        <div class="rd-transcript-row" *ngFor="let line of transcriptLines">
+          <span class="rd-transcript-time">{{ line.time }}</span>
+          <p class="rd-transcript-text">{{ line.text }}</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right sidebar: calendar -->
+  <aside class="rd-right-sidebar">
+
+    <!-- Calendar header -->
+    <div class="rd-cal-header">
+      <div class="rd-cal-nav">
+        <h2 class="rd-cal-title">Today, Mar 17</h2>
+        <div class="rd-cal-arrows">
+          <button class="rd-cal-arrow"><span class="material-symbols-outlined">chevron_left</span></button>
+          <button class="rd-cal-arrow"><span class="material-symbols-outlined">chevron_right</span></button>
+        </div>
+      </div>
+
+      <!-- Mini calendar -->
+      <div class="rd-cal-grid">
+        <span class="rd-cal-dow" *ngFor="let d of weekDays">{{ d }}</span>
+        <button
+          *ngFor="let day of calendarDays"
+          class="rd-cal-day"
+          [class.today]="day.type === 'today'"
+          [class.prev]="day.type === 'prev'"
+        >{{ day.num }}</button>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="rd-no-meetings">
+      <div class="rd-clock-icon">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="2"/>
+          <path d="M50 30V50L65 60" stroke="currentColor" stroke-linecap="round" stroke-width="2"/>
+        </svg>
+      </div>
+      <h4 class="rd-no-meetings-title">No meetings scheduled</h4>
+      <p class="rd-no-meetings-sub">You're all caught up! Enjoy your free time or schedule a new meeting.</p>
+      <button class="rd-schedule-btn">
+        <span class="material-symbols-outlined">add</span>
+        Schedule meeting
+      </button>
+    </div>
+
+  </aside>
+</div>

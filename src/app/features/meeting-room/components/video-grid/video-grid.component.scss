@@ -1,0 +1,93 @@
+.video-grid-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.video-grid {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  min-height: 0;
+
+  // Featured tile: spans 2 rows (used when count = 8)
+  // .tile-featured is applied to the app-video-tile host element
+  app-video-tile.tile-featured {
+    grid-row: span 2;
+  }
+}
+
+// Page navigation
+.page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 0 4px;
+  flex-shrink: 0;
+}
+
+.page-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.15s;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+}
+
+.page-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.page-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+
+  &.active {
+    background: #3b82f6;
+    width: 20px;
+    border-radius: 4px;
+  }
+}
+
+.page-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  min-width: 40px;
+  text-align: center;
+}

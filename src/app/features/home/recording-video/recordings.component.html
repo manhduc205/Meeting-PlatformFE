@@ -1,0 +1,164 @@
+<!-- We are inside the HomeComponent's page-content -->
+<div class="rv-layout">
+  
+  <!-- SECONDARY SIDEBAR (sub-nav) -->
+  <aside class="rv-subnav">
+    <div class="rv-subnav-inner">
+      <p class="rv-subnav-title">Clips</p>
+      <a
+        *ngFor="let sn of subNavItems"
+        href="#"
+        class="rv-subnav-item"
+        [class.active]="activeSubNav() === sn.key"
+        (click)="$event.preventDefault(); setActiveSubNav(sn.key)"
+      >
+        <span class="material-symbols-outlined">{{ sn.icon }}</span>
+        <span>{{ sn.label }}</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="rv-main">
+    <div class="rv-page-content">
+
+      <!-- Upgrade banner -->
+      <div class="rv-banner" *ngIf="!bannerClosed()">
+        <span class="material-symbols-outlined rv-banner-icon">info</span>
+        <p class="rv-banner-text">
+          Your current plan allows you to record up to 5 clips, each up to 2 minutes.
+          Upgrade to <a href="#" class="rv-banner-link">VideoConnect Clips Plus</a> for unlimited
+          videos with no time limit, or select
+          <a href="#" class="rv-banner-link">VideoConnect Workplace Pro</a> for more advanced features.
+        </p>
+        <div class="rv-banner-right">
+          <span class="rv-banner-count">1 of 5 clips</span>
+          <button class="rv-banner-close" (click)="bannerClosed.set(true)">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Section title + top actions -->
+      <div class="rv-section-top">
+        <h2 class="rv-section-title">My clips</h2>
+        <div class="rv-section-actions">
+          <a href="#" class="rv-feedback-link">Feedback</a>
+          <button class="rv-icon-btn">
+            <span class="material-symbols-outlined">refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="rv-action-btns">
+        <button class="rv-action-btn">
+          <span class="rv-rec-dot"></span>
+          <span>Record clip</span>
+        </button>
+        <button class="rv-action-btn rv-ai-btn">
+          <span class="material-symbols-outlined rv-ai-icon">auto_awesome</span>
+          <span>Create with AI Companion</span>
+          <span class="rv-new-badge">NEW</span>
+        </button>
+        <button class="rv-action-btn">
+          <span class="material-symbols-outlined rv-upload-icon">upload</span>
+          <span>Upload video</span>
+          <span class="material-symbols-outlined rv-lock-icon">lock</span>
+        </button>
+      </div>
+
+      <!-- Search and filters -->
+      <div class="rv-filters">
+        <div class="rv-filter-left">
+          <div class="rv-filter-search">
+            <span class="material-symbols-outlined rv-filter-search-icon">search</span>
+            <input type="text" class="rv-filter-input" placeholder="Search by clip name" />
+          </div>
+          <select class="rv-select">
+            <option>Latest created</option>
+            <option>Oldest created</option>
+          </select>
+          <select class="rv-select">
+            <option>Select a tag</option>
+            <option>Work</option>
+            <option>Personal</option>
+          </select>
+          <select class="rv-select">
+            <option>All status</option>
+            <option>Processing</option>
+            <option>Ready</option>
+          </select>
+        </div>
+        <div class="rv-view-toggle">
+          <button
+            class="rv-view-btn"
+            [class.active]="viewMode() === 'grid'"
+            (click)="setViewMode('grid')"
+          >
+            <span class="material-symbols-outlined">grid_view</span>
+          </button>
+          <button
+            class="rv-view-btn"
+            [class.active]="viewMode() === 'list'"
+            (click)="setViewMode('list')"
+          >
+            <span class="material-symbols-outlined">list</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Video Grid -->
+      <div class="rv-clip-grid" [class.list-view]="viewMode() === 'list'">
+
+        <!-- Actual clip cards -->
+        <div
+          class="rv-clip-card"
+          *ngFor="let rec of recordings"
+          (click)="openRecording(rec)"
+        >
+          <div class="rv-clip-thumb">
+            <img [src]="rec.thumbnailUrl" [alt]="rec.title" class="rv-clip-img" />
+            <div class="rv-clip-duration">
+              <span class="material-symbols-outlined rv-play-icon">play_arrow</span>
+              <span>{{ rec.duration }}</span>
+            </div>
+            <div class="rv-clip-hover-overlay">
+              <span class="material-symbols-outlined rv-hover-play">play_circle</span>
+            </div>
+          </div>
+          <div class="rv-clip-info">
+            <div class="rv-clip-title-row">
+              <h3 class="rv-clip-title">{{ rec.title }}</h3>
+              <button class="rv-clip-more" (click)="$event.stopPropagation()">
+                <span class="material-symbols-outlined">more_horiz</span>
+              </button>
+            </div>
+            <div class="rv-clip-meta">
+              <img [src]="rec.avatarUrl" [alt]="rec.creator" class="rv-clip-avatar" />
+              <div class="rv-clip-meta-text">
+                <span class="rv-clip-creator">{{ rec.creator }}</span>
+                <span class="rv-clip-time">{{ rec.createdAt }}</span>
+              </div>
+              <button class="rv-clip-link" (click)="$event.stopPropagation()">
+                <span class="material-symbols-outlined">link</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Placeholder "Add" card -->
+        <div class="rv-clip-card rv-placeholder">
+          <div class="rv-clip-thumb rv-placeholder-thumb">
+            <span class="material-symbols-outlined rv-placeholder-icon">add</span>
+          </div>
+          <div class="rv-clip-info rv-placeholder-info">
+            <div class="rv-placeholder-line rv-line-lg"></div>
+            <div class="rv-placeholder-line rv-line-sm"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>

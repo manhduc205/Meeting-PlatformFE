@@ -63,9 +63,8 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
 
   joinNow() {
     this.isJoining.set(true);
-    // Navigate to meeting room — extend routing as needed
     setTimeout(() => {
-      this.router.navigate(['/meeting'], {
+      this.router.navigate(['/meeting-room'], {
         queryParams: { meetingId: this.meetingId() }
       });
     }, 1200);

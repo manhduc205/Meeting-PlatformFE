@@ -1,0 +1,192 @@
+// ===== ControlBar — Dark theme matching React design =====
+.ctrl-wrapper {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+// Reactions popover
+.reactions-popover {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(42, 45, 53, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+
+  .reaction-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 8px;
+    transition: background 0.15s, transform 0.15s;
+    line-height: 1;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+      transform: scale(1.25);
+    }
+  }
+}
+
+// Main bar
+.ctrl-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 16px;
+  background: rgba(30, 33, 39, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+  overflow-x: auto;
+  max-width: calc(100vw - 32px);
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.ctrl-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 10px;
+  border: none;
+  background: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'Inter', sans-serif;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  .ctrl-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .ctrl-arrow {
+      position: absolute;
+      top: -4px;
+      right: -8px;
+      color: rgba(255, 255, 255, 0.3);
+      display: flex;
+      align-items: center;
+
+      svg {
+        width: 8px;
+        height: 8px;
+      }
+    }
+
+    .ctrl-badge {
+      position: absolute;
+      top: -5px;
+      right: -8px;
+      background: #3b82f6;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      border-radius: 99px;
+      min-width: 14px;
+      height: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 2px;
+    }
+  }
+
+  .ctrl-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: inherit;
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+
+  &.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+  }
+
+  .icon-red {
+    color: #f87171;
+  }
+
+  .icon-green {
+    color: #4ade80;
+  }
+
+  &.off .ctrl-icon-wrap svg:not(.icon-red) {
+    color: #f87171;
+  }
+
+  &.ai-btn.active {
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+  }
+}
+
+.ctrl-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.danger-btn {
+  background: #ef4444 !important;
+  color: #fff !important;
+  padding: 6px 14px !important;
+  border-radius: 12px !important;
+
+  &:hover {
+    background: #dc2626 !important;
+  }
+}
+
+// Mobile
+@media (max-width: 600px) {
+  .ctrl-btn {
+    padding: 5px 7px;
+
+    .ctrl-label {
+      display: none;
+    }
+  }
+
+  .ctrl-bar {
+    padding: 8px 10px;
+    gap: 1px;
+  }
+}

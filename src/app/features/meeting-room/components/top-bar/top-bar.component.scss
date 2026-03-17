@@ -1,0 +1,264 @@
+// ===== TopBar — Dark theme matching React design =====
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 52px;
+  background: rgba(26, 29, 34, 0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  gap: 12px;
+  overflow: hidden;
+  z-index: 20;
+}
+
+.tb-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+
+  .tb-brand-icon {
+    width: 30px;
+    height: 30px;
+    background: #3b82f6;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    svg {
+      display: block;
+    }
+  }
+
+  .tb-meeting-info {
+    .tb-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    .tb-code-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tb-code {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .tb-copy-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.3);
+      padding: 0;
+      display: flex;
+      align-items: center;
+      transition: color 0.15s;
+
+      svg {
+        display: block;
+      }
+
+      &:hover {
+        color: #60a5fa;
+      }
+    }
+  }
+
+  .tb-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .tb-timer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .timer-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ef4444;
+      animation: pulse 1s infinite;
+    }
+
+    .timer-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.6);
+      font-variant-numeric: tabular-nums;
+      font-family: 'JetBrains Mono', monospace, sans-serif;
+    }
+  }
+}
+
+.tb-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+
+  .tb-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+
+    .tb-pill-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      svg {
+        display: block;
+      }
+
+      &.green {
+        color: #4ade80;
+      }
+
+      &.blue {
+        color: #60a5fa;
+      }
+
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    &.tb-pill-btn {
+      cursor: pointer;
+      transition: background 0.15s;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+    }
+  }
+}
+
+.tb-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+
+  .tb-icon-btn {
+    width: 32px;
+    height: 32px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+
+    svg {
+      display: block;
+    }
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+  }
+
+  .tb-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .tb-user-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: background 0.15s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .tb-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .tb-username {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 500;
+    }
+
+    .tb-chevron {
+      display: flex;
+      align-items: center;
+      color: rgba(255, 255, 255, 0.4);
+
+      svg {
+        display: block;
+      }
+    }
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+// Responsive
+@media (max-width: 900px) {
+  .tb-center {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .tb-right .tb-username {
+    display: none;
+  }
+
+  .top-bar {
+    padding: 0 10px;
+  }
+}

@@ -1,0 +1,442 @@
+$primary: #0d59f2;
+$orange: #f97316;
+$transition: 0.2s ease;
+
+.content-grid {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 32px;
+  align-items: start;
+}
+
+// ====================================================
+// Left column
+// ====================================================
+.left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.welcome-section {
+  .welcome-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px;
+  }
+  .welcome-sub {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+  }
+}
+
+// Action buttons
+.action-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+
+  .action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 12px;
+    border: none;
+    border-radius: 18px;
+    cursor: pointer;
+    color: #fff;
+    transition: transform $transition, box-shadow $transition;
+    font-family: 'Inter', sans-serif;
+
+    &.orange {
+      background: $orange;
+      box-shadow: 0 8px 24px rgba($orange, 0.3);
+    }
+
+    &.primary {
+      background: $primary;
+      box-shadow: 0 8px 24px rgba($primary, 0.25);
+    }
+
+    &:hover {
+      transform: scale(1.03);
+    }
+
+    .action-icon-wrap {
+      width: 52px;
+      height: 52px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 14px;
+      transition: background $transition;
+
+      .material-symbols-outlined { font-size: 28px; }
+    }
+
+    &:hover .action-icon-wrap { background: rgba(255,255,255,0.3); }
+
+    .action-label {
+      font-size: 13px;
+      font-weight: 700;
+    }
+  }
+}
+
+// Quick Actions card
+.quick-actions-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0;
+    }
+
+    .view-all-btn {
+      background: none;
+      border: none;
+      color: $primary;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+
+      &:hover { text-decoration: underline; }
+    }
+  }
+
+  .qa-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .qa-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border: 1px solid #f1f5f9;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background $transition;
+
+    &:hover { background: #f8fafc; }
+
+    .qa-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+
+      .material-symbols-outlined { font-size: 20px; }
+    }
+
+    &.green .qa-icon {
+      background: #dcfce7;
+      color: #16a34a;
+    }
+
+    &.purple .qa-icon {
+      background: #ede9fe;
+      color: #7c3aed;
+    }
+
+    .qa-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+      margin: 0 0 3px;
+    }
+
+    .qa-sub {
+      font-size: 11px;
+      color: #94a3b8;
+      margin: 0;
+    }
+  }
+}
+
+// ====================================================
+// Right column
+// ====================================================
+.right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+// Meetings card
+.meetings-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+
+  .meetings-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid #f1f5f9;
+    background: rgba(248, 250, 252, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0;
+    }
+
+    .more-icon {
+      color: #94a3b8;
+      font-size: 20px;
+      cursor: pointer;
+    }
+  }
+
+  .meetings-list {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .meeting-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px;
+    border-radius: 12px;
+    transition: background $transition;
+    cursor: pointer;
+
+    &:hover { background: #f8fafc; }
+
+    &.dimmed { opacity: 0.75; }
+  }
+
+  .meeting-date {
+    width: 54px;
+    height: 54px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    color: #64748b;
+    flex-shrink: 0;
+
+    &.active {
+      background: rgba($primary, 0.1);
+      color: $primary;
+    }
+
+    .date-month {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .date-day {
+      font-size: 22px;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+  }
+
+  .meeting-info {
+    flex: 1;
+    min-width: 0;
+
+    .meeting-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0 0 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meeting-time {
+      font-size: 11px;
+      color: #94a3b8;
+      margin: 0 0 6px;
+    }
+  }
+
+  .avatar-stack {
+    display: flex;
+    align-items: center;
+
+    .meeting-avatar {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1.5px solid #fff;
+      margin-left: -6px;
+      object-fit: cover;
+
+      &:first-child { margin-left: 0; }
+    }
+
+    .avatar-extra {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      border: 1.5px solid #fff;
+      margin-left: -6px;
+      font-size: 8px;
+      font-weight: 700;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
+  .meeting-action-btn {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: opacity $transition;
+
+    &.primary-btn {
+      background: $primary;
+      color: #fff;
+      border: none;
+      box-shadow: 0 2px 8px rgba($primary, 0.3);
+    }
+
+    &.outline-btn {
+      background: transparent;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+    }
+
+    &:hover { opacity: 0.85; }
+  }
+
+  .see-schedule-btn {
+    width: 100%;
+    padding: 12px;
+    background: none;
+    border: none;
+    border-top: 1px solid #f1f5f9;
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: color $transition;
+
+    &:hover { color: $primary; }
+  }
+}
+
+// Promo card
+.promo-card {
+  background: linear-gradient(135deg, $primary 0%, #2563eb 100%);
+  border-radius: 18px;
+  padding: 24px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba($primary, 0.35);
+
+  .promo-content {
+    position: relative;
+    z-index: 2;
+
+    .promo-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0 0 8px;
+    }
+
+    .promo-sub {
+      font-size: 13px;
+      color: rgba(255,255,255,0.8);
+      margin: 0 0 18px;
+      line-height: 1.5;
+    }
+
+    .promo-btn {
+      background: #fff;
+      color: $primary;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: opacity $transition;
+
+      &:hover { opacity: 0.92; }
+    }
+  }
+
+  .promo-bg-icon {
+    position: absolute;
+    right: -12px;
+    bottom: -12px;
+    opacity: 0.18;
+
+    .material-symbols-outlined { font-size: 110px; }
+  }
+}
+
+// ====================================================
+// Responsive
+// ====================================================
+@media (max-width: 1024px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .right-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .right-col {
+    grid-template-columns: 1fr;
+  }
+}

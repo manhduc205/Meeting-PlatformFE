@@ -1,32 +1,16 @@
-import { Component, signal } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
+import { Router } from '@angular/router';
 
 @Component({
-  selector: 'app-home',
+  selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule],
-  templateUrl: './home.component.html',
-  styleUrls: ['./home.component.scss']
+  imports: [CommonModule],
+  templateUrl: './dashboard.component.html',
+  styleUrls: ['./dashboard.component.scss']
 })
-export class HomeComponent {
+export class DashboardComponent {
   constructor(public router: Router) {}
-  sidebarOpen = signal(false);
-
-  toggleSidebar() {
-    this.sidebarOpen.update(v => !v);
-  }
-
-  closeSidebar() {
-    this.sidebarOpen.set(false);
-  }
-
-  navItems = [
-    { icon: 'home', label: 'Home', route: '/', active: true },
-    { icon: 'video_camera_front', label: 'Meetings', route: null, active: false },
-    { icon: 'record_voice_over', label: 'Recordings', route: '/recordings', active: false },
-    { icon: 'contacts', label: 'Contacts', route: null, active: false },
-  ];
 
   actionButtons = [
     { icon: 'video_call', label: 'New Meeting', color: 'orange', route: 'waiting-room' },

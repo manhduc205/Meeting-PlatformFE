@@ -1,0 +1,204 @@
+// ===== Whiteboard — Dark theme matching React design =====
+.whiteboard-overlay {
+  position: absolute;
+  inset: 16px;
+  z-index: 40;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  background: #1a1d22;
+}
+
+.whiteboard {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+// Toolbar
+.wb-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(30, 33, 39, 0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.wb-title-text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-right: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+// Tool group
+.wb-tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.wb-tool-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 0.15s;
+
+  svg { display: block; }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+
+  &.active {
+    background: #3b82f6;
+    color: #fff;
+  }
+}
+
+// Colors
+.wb-colors {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wb-color-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+
+  &.selected {
+    border-color: #fff;
+    transform: scale(1.15);
+  }
+
+  &:hover:not(.selected) {
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+// Sizes
+.wb-sizes {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 5px 8px;
+}
+
+.wb-size-btn {
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+
+  &.selected {
+    background: #3b82f6;
+  }
+
+  &:hover:not(.selected) {
+    background: rgba(255, 255, 255, 0.55);
+  }
+}
+
+.wb-spacer { flex: 1; }
+
+// Action buttons
+.wb-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  svg { flex-shrink: 0; }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+
+  &.wb-save-btn {
+    color: #60a5fa;
+    background: rgba(96, 165, 250, 0.1);
+    border-color: rgba(96, 165, 250, 0.2);
+
+    &:hover {
+      background: rgba(96, 165, 250, 0.2);
+      color: #fff;
+    }
+  }
+}
+
+.wb-close-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+  transition: all 0.15s;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+}
+
+// Canvas
+.wb-canvas {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  cursor: crosshair;
+  display: block;
+}
+
+// Responsive
+@media (max-width: 600px) {
+  .whiteboard-overlay { inset: 8px; }
+  .wb-title-text { display: none; }
+}
