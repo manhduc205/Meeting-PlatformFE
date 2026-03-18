@@ -296,13 +296,13 @@ $transition: 0.2s ease;
     &.active {
       background: $primary;
       box-shadow: 0 4px 16px rgba($primary, 0.4);
-      &:hover { background: darken($primary, 6%); }
+      &:hover { filter: brightness(0.92); }
     }
 
     &.off {
       background: #ef4444;
       box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
-      &:hover { background: darken(#ef4444, 6%); }
+      &:hover { filter: brightness(0.92); }
     }
 
     &.ghost {
@@ -579,7 +579,8 @@ $transition: 0.2s ease;
   .material-symbols-outlined { font-size: 20px; }
 
   &:hover:not(.loading) {
-    background: darken($primary, 6%);
+    background: $primary;
+    filter: brightness(0.92);
     box-shadow: 0 8px 28px rgba($primary, 0.4);
     transform: translateY(-1px);
   }
