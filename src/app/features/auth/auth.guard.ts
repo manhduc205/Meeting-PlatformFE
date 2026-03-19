@@ -1,22 +1,22 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn } from '@angular/router';
-import { AuthService } from './auth.service';
+import { KeycloakService } from 'keycloak-angular';
 
 /**
  * Auth Guard to protect routes that require authentication
- * Redirects to login page if user is not authenticated
+ * Redirects to Keycloak login page if user is not authenticated
  */
-export const authGuard: CanActivateFn = (route, state) => {
-  const authService = inject(AuthService);
-  const router = inject(Router);
+export const authGuard: CanActivateFn = async (route, state) => {
+  const keycloak = inject(KeycloakService);
 
-  if (authService.isLoggedIn()) {
+  // Check if user is logged in
+  if (keycloak.isLoggedIn()) {
     return true;
   }
 
-  // Redirect to login page with return url
-  router.navigate(['/login'], {
-    queryParams: { returnUrl: state.url }
+  // Nếu chưa đăng nhập, đá sang màn hình Login của Keycloak
+  await keycloak.login({
+    redirectUri: window.location.origin + state.url
   });
   return false;
 };
@@ -25,15 +25,16 @@ export const authGuard: CanActivateFn = (route, state) => {
  * Guest Guard to prevent authenticated users from accessing login page
  * Redirects to home page if user is already authenticated
  */
-export const guestGuard: CanActivateFn = () => {
-  const authService = inject(AuthService);
+export const guestGuard: CanActivateFn = async () => {
+  const keycloak = inject(KeycloakService);
   const router = inject(Router);
 
-  if (!authService.isLoggedIn()) {
-    return true;
+  // Check if user is already logged in
+  if (keycloak.isLoggedIn()) {
+    // Redirect to home if already logged in
+    router.navigate(['/home']);
+    return false;
   }
 
-  // Redirect to home if already logged in
-  router.navigate(['/']);
-  return false;
+  return true;
 };

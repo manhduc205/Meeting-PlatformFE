@@ -27,10 +27,11 @@
     "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@angular/build": "^21.2.1",
+    "@angular/build": "^20.3.20",
     "@angular/cli": "^21.2.1",
     "@angular/compiler-cli": "^21.2.0",
-    "@openapitools/openapi-generator-cli": "^2.30.2",
+    "@openapitools/openapi-generator-cli": "^2.18.4",
+    "@types/google.accounts": "^0.0.18",
     "@types/sockjs-client": "^1.5.4",
     "autoprefixer": "^10.4.27",
     "jsdom": "^28.0.0",

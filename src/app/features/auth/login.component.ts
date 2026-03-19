@@ -25,6 +25,7 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
 
   loading = signal(false);
   imageError = signal(false);
+  errorMessage = signal<string | null>(null);
   private animationFrameId: number | null = null;
   private leftAnimationFrameId: number | null = null;
 
@@ -43,6 +44,8 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
     if (this.leftCanvasRef) {
       this.initConstellation(this.leftCanvasRef.nativeElement, 'blue');
     }
+
+    // Keycloak handles OAuth automatically, no need to check for tokens here
   }
 
   ngOnDestroy() {
@@ -152,17 +155,24 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
     window.addEventListener('resize', onResize);
   }
 
+  /**
+   * Handle login button click - redirects to Keycloak login page
+   * Keycloak can be configured to show Google account picker
+   */
   async handleLogin() {
     this.loading.set(true);
+    this.errorMessage.set(null);
 
     try {
-      // Call AuthService to handle Google OAuth
-      await this.authService.loginWithGoogle();
+      // Redirect to Keycloak login
+      // Keycloak will handle authentication and redirect back
+      await this.authService.login();
 
-      // Navigate to home after successful login
-      this.router.navigate(['/']);
-    } catch (error) {
+      // Note: The page will redirect, so we won't reach here
+      // Loading state will be reset when page redirects back
+    } catch (error: any) {
       console.error('Login error:', error);
+      this.errorMessage.set(error.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
       this.loading.set(false);
     }
   }
