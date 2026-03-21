@@ -1,7 +1,8 @@
 import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { KeycloakService } from 'keycloak-angular';
-import { KeycloakProfile } from 'keycloak-js';
+import Keycloak, { KeycloakProfile } from 'keycloak-js';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 export interface User {
   id: string;
@@ -22,7 +23,8 @@ export class AuthService {
 
   constructor(
     private router: Router,
-    private keycloakService: KeycloakService
+    private keycloak: Keycloak,
+    private http: HttpClient
   ) {
     // Initialize user from Keycloak
     this.initializeUser();
@@ -32,12 +34,18 @@ export class AuthService {
    * Initialize user data from Keycloak
    */
   private async initializeUser() {
-    if (this.keycloakService.isLoggedIn()) {
+    if (this.keycloak.authenticated) {
       try {
-        const profile = await this.keycloakService.loadUserProfile();
-        const user = this.mapKeycloakProfileToUser(profile);
+        const profile = await this.keycloak.loadUserProfile();
+        const user = this.mapKeycloakProfileToUser(profile, this.keycloak.tokenParsed);
         this.currentUser.set(user);
         this.isAuthenticated.set(true);
+        
+        // Sync user with backend
+        this.http.get(`${environment.backendApiUrl}/sync`, { responseType: 'text' }).subscribe({
+          next: (res) => console.log('User synchronization response:', res),
+          error: (err) => console.error('Failed to synchronize user:', err)
+        });
       } catch (error) {
         console.error('Error loading user profile:', error);
         this.isAuthenticated.set(false);
@@ -48,16 +56,18 @@ export class AuthService {
   /**
    * Map Keycloak profile to User interface
    */
-  private mapKeycloakProfileToUser(profile: KeycloakProfile): User {
+  private mapKeycloakProfileToUser(profile: KeycloakProfile, tokenParsed?: any): User {
+    const fallbackName = profile.firstName ? (profile.firstName + ' ' + (profile.lastName || '')) : (profile.username || 'User');
+    const pictureUrl = tokenParsed?.picture || (profile as any).picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName)}&background=2d6ef7&color=fff`;
+
     return {
       id: profile.id || '',
-      email: profile.email || '',
-      name: `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.username || '',
-      username: profile.username,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      // Keycloak doesn't provide picture by default, but you can add it via custom attributes
-      picture: (profile as any).picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.firstName || '')}+${encodeURIComponent(profile.lastName || '')}&background=2d6ef7&color=fff`
+      email: profile.email || tokenParsed?.email || '',
+      name: fallbackName,
+      username: profile.username || tokenParsed?.preferred_username,
+      firstName: profile.firstName || tokenParsed?.given_name,
+      lastName: profile.lastName || tokenParsed?.family_name,
+      picture: pictureUrl
     };
   }
 
@@ -66,7 +76,8 @@ export class AuthService {
    * Keycloak can be configured to use Google as Identity Provider
    */
   async login(redirectUri?: string): Promise<void> {
-    await this.keycloakService.login({
+    await this.keycloak.login({
+      idpHint: 'google', // This will hint Keycloak to show Google login option directly
       redirectUri: redirectUri || window.location.origin + '/home'
     });
   }
@@ -78,7 +89,10 @@ export class AuthService {
     this.currentUser.set(null);
     this.isAuthenticated.set(false);
 
-    await this.keycloakService.logout(window.location.origin + '/login');
+    const redirectUri = window.location.origin + '/login';
+    await this.keycloak.logout({ 
+      redirectUri: redirectUri
+    });
   }
 
   /**
@@ -92,7 +106,7 @@ export class AuthService {
    * Check if user is authenticated
    */
   isLoggedIn(): boolean {
-    return this.keycloakService.isLoggedIn();
+    return !!this.keycloak.authenticated;
   }
 
   /**
@@ -113,31 +127,31 @@ export class AuthService {
    * Get user roles from Keycloak
    */
   getUserRoles(): string[] {
-    return this.keycloakService.getUserRoles();
+    return this.keycloak.realmAccess?.roles || [];
   }
 
   /**
    * Check if user has a specific role
    */
   hasRole(role: string): boolean {
-    return this.keycloakService.isUserInRole(role);
+    return this.keycloak.hasRealmRole(role);
   }
 
   /**
    * Get Keycloak token
    */
   async getToken(): Promise<string> {
-    return this.keycloakService.getToken();
+    return this.keycloak.token || '';
   }
 
   /**
    * Refresh user profile data
    */
   async refreshUserProfile(): Promise<void> {
-    if (this.keycloakService.isLoggedIn()) {
+    if (this.keycloak.authenticated) {
       try {
-        const profile = await this.keycloakService.loadUserProfile();
-        const user = this.mapKeycloakProfileToUser(profile);
+        const profile = await this.keycloak.loadUserProfile();
+        const user = this.mapKeycloakProfileToUser(profile, this.keycloak.tokenParsed);
         this.currentUser.set(user);
         this.isAuthenticated.set(true);
       } catch (error) {

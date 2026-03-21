@@ -164,16 +164,14 @@ export class LoginComponent implements AfterViewInit, OnDestroy {
     this.errorMessage.set(null);
 
     try {
-      // Redirect to Keycloak login
-      // Keycloak will handle authentication and redirect back
+      // Gọi AuthService, nó sẽ tự động chèn idpHint='google'
       await this.authService.login();
-
-      // Note: The page will redirect, so we won't reach here
-      // Loading state will be reset when page redirects back
+      
+      // Không cần set(false) ở đây vì trang sẽ bị redirect đi ngay lập tức
     } catch (error: any) {
       console.error('Login error:', error);
-      this.errorMessage.set(error.message || 'Đăng nhập thất bại. Vui lòng thử lại.');
-      this.loading.set(false);
+      this.errorMessage.set('Đăng nhập thất bại. Vui lòng kiểm tra lại kết nối.');
+      this.loading.set(false); // Chỉ tắt loading khi có lỗi xảy ra
     }
   }
 

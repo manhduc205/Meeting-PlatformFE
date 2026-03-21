@@ -12,11 +12,13 @@
   "private": true,
   "packageManager": "npm@10.9.3",
   "dependencies": {
+    "@angular/animations": "^21.2.0",
     "@angular/common": "^21.2.0",
     "@angular/compiler": "^21.2.0",
     "@angular/core": "^21.2.0",
     "@angular/forms": "^21.2.0",
     "@angular/platform-browser": "^21.2.0",
+    "@angular/platform-browser-dynamic": "^21.2.0",
     "@angular/router": "^21.2.0",
     "@stomp/stompjs": "^7.3.0",
     "keycloak-angular": "^21.0.0",
@@ -24,10 +26,11 @@
     "livekit-client": "^2.17.2",
     "rxjs": "~7.8.0",
     "sockjs-client": "^1.6.1",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "zone.js": "~0.15.0"
   },
   "devDependencies": {
-    "@angular/build": "^20.3.20",
+    "@angular/build": "^21.2.0",
     "@angular/cli": "^21.2.1",
     "@angular/compiler-cli": "^21.2.0",
     "@openapitools/openapi-generator-cli": "^2.18.4",
@@ -38,7 +41,7 @@
     "postcss": "^8.5.8",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.2.1",
-    "typescript": "~5.9.2",
-    "vitest": "^4.0.8"
+    "typescript": "~5.9.0",
+    "vitest": "^3.0.0"
   }
 }

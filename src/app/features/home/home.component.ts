@@ -1,6 +1,7 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
+import { AuthService } from '../auth/auth.service';
 
 @Component({
   selector: 'app-home',
@@ -11,7 +12,23 @@ import { Router, RouterModule } from '@angular/router';
 })
 export class HomeComponent {
   constructor(public router: Router) {}
+  authService = inject(AuthService);
+  userSignal = this.authService.getUserSignal();
+
+  get user() {
+    return this.userSignal();
+  }
+
+  showUserMenu = signal(false);
   sidebarOpen = signal(false);
+
+  toggleUserMenu() {
+    this.showUserMenu.update(v => !v);
+  }
+
+  onLogout() {
+    this.authService.logout();
+  }
 
   toggleSidebar() {
     this.sidebarOpen.update(v => !v);

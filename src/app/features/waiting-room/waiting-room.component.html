@@ -21,7 +21,7 @@
       </button>
       <div class="hdr-divider"></div>
       <div class="hdr-avatar"
-           style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB_mLGiLMNACHCFzbVOrj16IYN2lY2WQGd-mBQtwBDp3_nCcOkTBLK6xRjkEapzaixtCymO-tDmEfFW20Mama86XKbT7BmSD0pAKnwn4dB_WnhaFuk4qQmgrfnje1znEBnDopOC7GVIQXgO-GQVzS00vj2-zA5GPRKrMwQnFt_dmWWewJgmAB4oMfFSXx22PIkqfQIsyGdMyIYos_UjafT0Lr19gY8YPrnwdZU0SaobrbW9_YiSFbR-xcNCV4yufy-iO7_TPfB18IU')">
+           [style.background-image]="'url(' + (user?.picture || 'https://ui-avatars.com/api/?name=User&background=2d6ef7&color=fff') + ')'">
       </div>
     </div>
   </header>
@@ -41,12 +41,14 @@
         <div class="video-preview">
           <!-- Camera feed / placeholder -->
           <div class="video-feed" [class.cam-off]="!camOn()">
-            <img
-              *ngIf="camOn()"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsnG69TJ28oKNPn2fHvGyWL7ksr6Dm43We8MebqNF2tUEy5LTatFshiMXQUeS5bgoeG1gbeNZXLyJdykfeR-gqalhwLFsDLyYE5UEoiW1wq_vyFSSEUcCuY91MkGRbGac2sHtt83AeCIP8UF041Ppwsd1of-WQ76kACh8gKEYsZXUX4-Dvxhh3Cs0ns6A0NEzB6Lpa6LtWh-RY-okzXkL5asdNSKDHYJiwKshC-POtD-VyrBnHTYp48L0FaKUfgHze-LmQnc62Jrs'"
-              alt="Camera preview"
-              class="feed-img"
-            />
+            <video
+              #videoElement
+              autoplay
+              muted
+              playsinline
+              [style.display]="camOn() ? 'block' : 'none'"
+              class="feed-video"
+            ></video>
             <div *ngIf="!camOn()" class="cam-off-placeholder">
               <span class="material-symbols-outlined">videocam_off</span>
               <span>Camera is off</span>
@@ -95,8 +97,8 @@
             <label>Microphone</label>
             <div class="select-wrap">
               <span class="material-symbols-outlined sel-icon">mic</span>
-              <select [(ngModel)]="selectedMic" name="mic">
-                <option *ngFor="let m of microphones" [value]="m">{{ m }}</option>
+              <select [(ngModel)]="selectedMicId" (change)="onDeviceChange()" name="mic">
+                <option *ngFor="let m of microphones" [value]="m.deviceId">{{ m.label || 'Microphone ' + m.deviceId }}</option>
               </select>
               <span class="material-symbols-outlined chevron">expand_more</span>
             </div>
@@ -105,8 +107,8 @@
             <label>Camera</label>
             <div class="select-wrap">
               <span class="material-symbols-outlined sel-icon">videocam</span>
-              <select [(ngModel)]="selectedCamera" name="cam">
-                <option *ngFor="let c of cameras" [value]="c">{{ c }}</option>
+              <select [(ngModel)]="selectedCameraId" (change)="onDeviceChange()" name="cam">
+                <option *ngFor="let c of cameras" [value]="c.deviceId">{{ c.label || 'Camera ' + c.deviceId }}</option>
               </select>
               <span class="material-symbols-outlined chevron">expand_more</span>
             </div>

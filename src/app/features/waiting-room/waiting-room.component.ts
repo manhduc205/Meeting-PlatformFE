@@ -1,7 +1,8 @@
-import { Component, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { AuthService } from '../auth/auth.service';
 
 @Component({
   selector: 'app-waiting-room',
@@ -11,6 +12,15 @@ import { ActivatedRoute, Router } from '@angular/router';
   styleUrls: ['./waiting-room.component.scss']
 })
 export class WaitingRoomComponent implements OnInit, OnDestroy {
+  @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
+
+  authService = inject(AuthService);
+  userSignal = this.authService.getUserSignal();
+
+  get user() {
+    return this.userSignal();
+  }
+
   meetingId = signal('821-4942-019');
   meetingTitle = signal('Weekly Sync: Product & Design');
   meetingTime = signal('Today, 10:00 AM – 11:00 AM');
@@ -22,20 +32,13 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
 
   copied = signal(false);
   private copyTimeout: any;
+  private localStream: MediaStream | null = null;
 
-  microphones = [
-    'Built-in Microphone (MacBook Pro)',
-    'External USB Microphone',
-    'Yeti Nano USB Mic',
-  ];
-  cameras = [
-    'FaceTime HD Camera',
-    'Logitech StreamCam',
-    'OBS Virtual Camera',
-  ];
+  microphones: MediaDeviceInfo[] = [];
+  cameras: MediaDeviceInfo[] = [];
 
-  selectedMic = this.microphones[0];
-  selectedCamera = this.cameras[0];
+  selectedMicId: string = '';
+  selectedCameraId: string = '';
 
   participants = [
     'https://lh3.googleusercontent.com/aida-public/AB6AXuCXbw3ZahtkQjyQC1uKV7uH_mO_N1Jvoiq66o4tjjNneKp1HO47Qu6HDDeupUAaTLJLipBNc7PMufolUa7PaSRa9xfrOQ_G9v9dYESH-ZXrokLoYyPd43XpgXdB-QyWnTJD6a8s3qqYCHKFjr-func8c5vzRnF0s6q_Lul9myYMlkjVqyJMl8FMVubYL_k0ssoZGZJUrzuCmBWe4q2G3OPZr8ul2UV4baSg9MCP92kcPdjkWPyO1jPTQ4pWY0fD2Le9OcfbbIZ05XM',
@@ -46,20 +49,79 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
 
   constructor(private route: ActivatedRoute, private router: Router) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     // Read query params when coming from join meeting link/form
     this.route.queryParams.subscribe(params => {
       if (params['meetingId']) this.meetingId.set(params['meetingId']);
       if (params['title']) this.meetingTitle.set(params['title']);
     });
+
+    await this.initDevices();
+  }
+
+  async initDevices() {
+    try {
+      // Prompt for permission first so devices can be enumerated with labels
+      this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      if (this.videoElement) {
+        this.videoElement.nativeElement.srcObject = this.localStream;
+      }
+      
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      this.microphones = devices.filter(d => d.kind === 'audioinput');
+      this.cameras = devices.filter(d => d.kind === 'videoinput');
+
+      if (this.microphones.length > 0) this.selectedMicId = this.microphones[0].deviceId;
+      if (this.cameras.length > 0) this.selectedCameraId = this.cameras[0].deviceId;
+
+      this.updateTracksState();
+    } catch (err) {
+      console.error('Error accessing hardware devices: ', err);
+      this.micOn.set(false);
+      this.camOn.set(false);
+    }
   }
 
   ngOnDestroy() {
     if (this.copyTimeout) clearTimeout(this.copyTimeout);
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => track.stop());
+    }
   }
 
-  toggleMic() { this.micOn.update(v => !v); }
-  toggleCam() { this.camOn.update(v => !v); }
+  toggleMic() { 
+    this.micOn.update(v => !v); 
+    this.updateTracksState();
+  }
+  
+  toggleCam() { 
+    this.camOn.update(v => !v); 
+    this.updateTracksState();
+  }
+
+  updateTracksState() {
+    if (!this.localStream) return;
+    this.localStream.getAudioTracks().forEach(track => track.enabled = this.micOn());
+    this.localStream.getVideoTracks().forEach(track => track.enabled = this.camOn());
+  }
+
+  async onDeviceChange() {
+    if (this.localStream) {
+       this.localStream.getTracks().forEach(t => t.stop());
+    }
+    try {
+      this.localStream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: this.selectedMicId ? { exact: this.selectedMicId } : undefined },
+        video: { deviceId: this.selectedCameraId ? { exact: this.selectedCameraId } : undefined }
+      });
+      if (this.videoElement) {
+        this.videoElement.nativeElement.srcObject = this.localStream;
+      }
+      this.updateTracksState();
+    } catch (e) {
+      console.error('Error switching devices', e);
+    }
+  }
 
   joinNow() {
     this.isJoining.set(true);

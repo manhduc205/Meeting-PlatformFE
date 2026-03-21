@@ -65,16 +65,31 @@
           <span class="material-symbols-outlined">settings</span>
         </button>
         <div class="divider"></div>
-        <div class="user-info">
+        <div class="user-info" (click)="toggleUserMenu()">
           <div class="user-text">
-            <p class="user-name">Alex Rivers</p>
-            <p class="user-role">Administrator</p>
+            <p class="user-name">{{ user?.name || 'Đang rải...' }}</p>
+            <p class="user-role">{{ user?.email || 'Người dùng' }}</p>
           </div>
           <img
             class="avatar"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1aRgCTeGrTf0M9gDA2uvR3VxB85d_SZ9HB_81FVZp6U-aoZVzmhZHEIxUpbyEZ4QvZAxekq7RrasZGgPgO2iLx9otT2eWbY55fSE8e9bBy_MA8rB37rF6xfYkZ21ssQ7gqSiYGJoY-oiRriqOS4Z7iVBeQTiqiDmsAA0RqA6Pdari5tcfgwpYUJDBtA_pDGwaqAA6IzMvEpgiKlAwxAWKBf3wHQj49lgzV_69swNT5YQK_XAGqKs6r3_PuY4ZVls8Lte2YXSIXeI"
-            alt="Alex Rivers"
+            [src]="user?.picture || 'https://ui-avatars.com/api/?name=User&background=2d6ef7&color=fff'"
+            [alt]="user?.name || 'User Avatar'"
           />
+
+          <!-- Dropdown menu -->
+          @if (showUserMenu()) {
+            <div class="user-dropdown-menu" (click)="$event.stopPropagation()">
+              <div class="dropdown-header">
+                <p class="dropdown-name">{{ user?.name }}</p>
+                <p class="dropdown-email">{{ user?.email }}</p>
+              </div>
+              <div class="dropdown-divider"></div>
+              <button class="dropdown-item logout-btn" (click)="onLogout()">
+                <span class="material-symbols-outlined">logout</span>
+                Đăng xuất
+              </button>
+            </div>
+          }
         </div>
       </div>
     </header>

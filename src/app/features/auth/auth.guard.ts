@@ -1,23 +1,23 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn } from '@angular/router';
-import { KeycloakService } from 'keycloak-angular';
+import Keycloak from 'keycloak-js';
 
 /**
  * Auth Guard to protect routes that require authentication
- * Redirects to Keycloak login page if user is not authenticated
+ * Redirects to CUSTOM Angular login page if user is not authenticated
  */
 export const authGuard: CanActivateFn = async (route, state) => {
-  const keycloak = inject(KeycloakService);
+  const keycloak = inject(Keycloak);
+  const router = inject(Router);
 
-  // Check if user is logged in
-  if (keycloak.isLoggedIn()) {
+  // 1. Kiểm tra nếu đã có Token hợp lệ
+  if (keycloak.authenticated) {
     return true;
   }
 
-  // Nếu chưa đăng nhập, đá sang màn hình Login của Keycloak
-  await keycloak.login({
-    redirectUri: window.location.origin + state.url
-  });
+  // 2. Chặn quyền truy cập và điều hướng về UI Login của Angular
+  // Tuyệt đối KHÔNG dùng keycloak.login() ở đây để giữ giao diện Glassmorphism
+  router.navigate(['/login']);
   return false;
 };
 
@@ -26,13 +26,13 @@ export const authGuard: CanActivateFn = async (route, state) => {
  * Redirects to home page if user is already authenticated
  */
 export const guestGuard: CanActivateFn = async () => {
-  const keycloak = inject(KeycloakService);
+  const keycloak = inject(Keycloak);
   const router = inject(Router);
 
-  // Check if user is already logged in
-  if (keycloak.isLoggedIn()) {
-    // Redirect to home if already logged in
-    router.navigate(['/home']);
+  // Nếu đã login thành công, không cho phép quay lại trang đăng nhập
+  if (keycloak.authenticated) {
+    // Điều hướng về '/' vì HomeComponent của bạn nằm ở path này
+    router.navigate(['/']); 
     return false;
   }
 
