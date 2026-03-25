@@ -51,7 +51,31 @@
   display: block;
   position: absolute;
   inset: 0;
+
+  // Flip local tile like a mirror (selfie-cam feel)
+  &.mirrored {
+    transform: scaleX(-1);
+  }
 }
+
+// Audio level bars — animated from LiveKit audioLevel
+.audio-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 12px;
+  flex-shrink: 0;
+
+  .bar {
+    display: block;
+    width: 2.5px;
+    background: #22c55e;
+    border-radius: 2px;
+    transition: height 0.1s ease;
+    min-height: 3px;
+  }
+}
+
 
 // Avatar background (when camera off) — fills the full tile
 .tile-avatar-bg {

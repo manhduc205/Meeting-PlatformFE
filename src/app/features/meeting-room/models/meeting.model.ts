@@ -10,7 +10,12 @@ export interface Participant {
   isHandRaised: boolean;
   isLocal?: boolean;
   isScreenSharing?: boolean;
-  videoSrc?: string;
+  /** Real WebRTC/LiveKit media stream (undefined = camera off / not yet received) */
+  stream?: MediaStream;
+  /** Audio level 0-1 from LiveKit ActiveSpeakersChanged */
+  audioLevel?: number;
+  /** LiveKit connection state for this participant */
+  connectionState?: 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 }
 
 export interface ChatMessage {

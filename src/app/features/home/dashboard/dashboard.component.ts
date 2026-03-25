@@ -1,16 +1,19 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { ScheduleModalComponent } from '../schedule-modal/schedule-modal.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ScheduleModalComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
 export class DashboardComponent {
   constructor(public router: Router) {}
+
+  isScheduleModalOpen = false;
 
   actionButtons = [
     { icon: 'video_call', label: 'New Meeting', color: 'orange', route: 'waiting-room' },
@@ -20,6 +23,10 @@ export class DashboardComponent {
   ];
 
   handleAction(btn: any) {
+    if (btn.label === 'Schedule') {
+      this.isScheduleModalOpen = true;
+      return;
+    }
     if (btn.route) {
       this.router.navigate([`/${btn.route}`], {
         queryParams: { title: 'Weekly Sync: Product & Design' }

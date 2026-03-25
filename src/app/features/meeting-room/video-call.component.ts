@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { MeetingStateService } from './services/meeting-state.service';
 import { TopBarComponent } from './components/top-bar/top-bar.component';
 import { VideoGridComponent } from './components/video-grid/video-grid.component';
@@ -30,13 +30,26 @@ import { HostToolsPanelComponent } from './components/host-tools-panel/host-tool
 export class VideoCallComponent implements OnInit, OnDestroy {
   ms = inject(MeetingStateService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
-  ngOnInit() {
-    this.ms.startSpeakerRotation();
+  async ngOnInit() {
+    const code = this.route.snapshot.queryParamMap.get('meetingId') ?? '';
+    const title = this.route.snapshot.queryParamMap.get('title') ?? 'Meeting';
+
+    if (!code) {
+      // No meeting code — redirect home
+      this.router.navigate(['/']);
+      return;
+    }
+
+    await this.ms.joinMeeting(code, title);
   }
 
-  ngOnDestroy() {
-    this.ms.stopSpeakerRotation();
+  async ngOnDestroy() {
+    // Only cleanup media if still connected (not if user manually left)
+    if (!this.ms.hasLeft()) {
+      await this.ms.cleanupMedia();
+    }
   }
 
   navigateHome() {

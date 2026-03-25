@@ -1,4 +1,12 @@
-import { Component, Input } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnChanges,
+  SimpleChanges,
+  ViewChild,
+  ElementRef,
+  AfterViewInit,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Participant } from '../../models/meeting.model';
 
@@ -11,17 +19,20 @@ import { Participant } from '../../models/meeting.model';
       class="video-tile"
       [class.speaking]="participant.isSpeaking"
     >
-      <!-- Video -->
-      <img
-        *ngIf="participant.isCameraOn && participant.videoSrc"
-        [src]="participant.videoSrc"
-        [alt]="participant.name"
+      <!-- ── Real <video> element (camera on & stream available) ── -->
+      <video
+        #videoEl
+        *ngIf="participant.isCameraOn && participant.stream"
         class="tile-video"
-      />
+        [class.mirrored]="isLocal"
+        autoplay
+        playsinline
+        muted
+      ></video>
 
-      <!-- Avatar (camera off or no videoSrc) -->
+      <!-- ── Avatar fallback (camera off or no stream yet) ── -->
       <div
-        *ngIf="!participant.isCameraOn || !participant.videoSrc"
+        *ngIf="!participant.isCameraOn || !participant.stream"
         class="tile-avatar-bg"
         [style.background-color]="participant.avatarColor + '22'"
       >
@@ -60,7 +71,13 @@ import { Participant } from '../../models/meeting.model';
       <!-- Bottom bar -->
       <div class="tile-bottom">
         <div class="tile-name-row">
-          <span class="speaking-dot" *ngIf="participant.isSpeaking"></span>
+          <!-- Audio level bars (from LiveKit ActiveSpeakersChanged) -->
+          <div class="audio-bars" *ngIf="participant.isSpeaking && !participant.isMuted">
+            <span class="bar" [style.height.px]="barHeight(0)"></span>
+            <span class="bar" [style.height.px]="barHeight(1)"></span>
+            <span class="bar" [style.height.px]="barHeight(2)"></span>
+          </div>
+          <span class="speaking-dot" *ngIf="participant.isSpeaking && !participant.audioLevel"></span>
           <span class="tile-you" *ngIf="isLocal">You · </span>
           <span class="tile-name">{{ participant.name }}</span>
         </div>
@@ -82,7 +99,39 @@ import { Participant } from '../../models/meeting.model';
   `,
   styleUrls: ['./video-tile.component.scss']
 })
-export class VideoTileComponent {
+export class VideoTileComponent implements AfterViewInit, OnChanges {
   @Input() participant!: Participant;
   @Input() isLocal = false;
+
+  @ViewChild('videoEl') videoEl?: ElementRef<HTMLVideoElement>;
+
+  ngAfterViewInit(): void {
+    this._attachStream();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Re-attach whenever the stream reference changes
+    if (changes['participant'] && this.videoEl) {
+      this._attachStream();
+    }
+  }
+
+  private _attachStream(): void {
+    const el = this.videoEl?.nativeElement;
+    if (!el) return;
+    const stream = this.participant?.stream;
+    if (el.srcObject !== stream) {
+      el.srcObject = stream ?? null;
+      if (stream) el.play().catch(() => {/* autoplay policy: muted allows it */});
+    }
+  }
+
+  /** Map audio level (0-1) to animated bar heights (px) */
+  barHeight(idx: number): number {
+    const level = this.participant?.audioLevel ?? 0;
+    const base = 3;
+    const offsets = [0, Math.PI / 3, (2 * Math.PI) / 3];
+    // Clamp between 3 and 12 px
+    return Math.max(base, Math.min(12, base + level * 9 * Math.abs(Math.sin(Date.now() / 150 + offsets[idx]))));
+  }
 }

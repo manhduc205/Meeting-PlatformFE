@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
+import { MeetingService, ActiveParticipantsResponse } from '../../core/services/meeting.service';
 
 @Component({
   selector: 'app-waiting-room',
@@ -21,10 +22,17 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
     return this.userSignal();
   }
 
-  meetingId = signal('821-4942-019');
-  meetingTitle = signal('Weekly Sync: Product & Design');
-  meetingTime = signal('Today, 10:00 AM – 11:00 AM');
-  participantCount = signal(12);
+  meetingService = inject(MeetingService);
+
+  meetingId = signal('');
+  meetingTitle = signal('Loading...');
+  meetingTime = signal('Loading schedules...');
+  
+  activeParticipantsInfo = signal<ActiveParticipantsResponse>({
+    totalCount: 0,
+    participants: [],
+    displayText: 'No participants yet'
+  });
 
   micOn = signal(true);
   camOn = signal(true);
@@ -40,23 +48,34 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
   selectedMicId: string = '';
   selectedCameraId: string = '';
 
-  participants = [
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuCXbw3ZahtkQjyQC1uKV7uH_mO_N1Jvoiq66o4tjjNneKp1HO47Qu6HDDeupUAaTLJLipBNc7PMufolUa7PaSRa9xfrOQ_G9v9dYESH-ZXrokLoYyPd43XpgXdB-QyWnTJD6a8s3qqYCHKFjr-func8c5vzRnF0s6q_Lul9myYMlkjVqyJMl8FMVubYL_k0ssoZGZJUrzuCmBWe4q2G3OPZr8ul2UV4baSg9MCP92kcPdjkWPyO1jPTQ4pWY0fD2Le9OcfbbIZ05XM',
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuBWBjy9LRbtGYAaAJkp50ROhOO8YK9sJBDk0u9w_eV-wK-ZU62GZdG8gpRV2o8yu0A5jZC5-Bw3QD00381VOZEnQK626Hv9sVvsw2ArXm0aOLiEtCuVNEFu3i3KIUN10N1ZBMszoP6MFXYQFhGoUF_rgdlDX0nl7Wm9iuxpHqksCQUTUha1T_QkyrbHEcpAZ_S1z8taORNmd0141qic72al9CaCOauINbkEvvHBjkSvIUqdvqZK1eZgg04WJMVwtRO9chRFy2VzKjU',
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuAvxASoeCcvTfMPYCSnwFOlxZZmgKoFQDahV8Bp42PLEH_WaFyBNH-99Ms-kixmj3-FKb09Gk57UMZN5Qkr522WeuHYbcciXNsFGM4AIkj7ntDj31IuK7-yxyKv-hdvCXTaOSyzpdTcvSQxEYcHI3zSAhvrEbXnq_G2Ba_E5fYBftbT1mN8dJdXoBnwbvrGMKDMheHTHqDi60VmP-tJNqQJYLFt3NS8xaOuool9UG_2l2PgRkeaMg7qfTGl1i26Kf5kiS2LKi7IVo0',
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuBKEBwg6WRGi5iKC6iZOFm3bBN8ICUCqgw_re_bUbDXSeJdmhZKeUfUevYxrkviLmT2VUcz4rT6O4Isw9KJcJTWJ_UJW20BoxPmTo-dAPT6sbU_DmTK3PVOfzp9DlSIaGEzBFGw4z314UHIUYYNateIMm75336hAUNj9HMKcK7MRsBJBfj66qRl9Y6J6RUPyNJ9tVXrUlGIVmqTNtzlIvZFT7VWQvJMHrzq_Za2qYd3WaHJzJMna-E_7Bj850lEJyivthKG-kwUi9c',
-  ];
-
   constructor(private route: ActivatedRoute, private router: Router) {}
 
   async ngOnInit() {
     // Read query params when coming from join meeting link/form
     this.route.queryParams.subscribe(params => {
-      if (params['meetingId']) this.meetingId.set(params['meetingId']);
+      if (params['meetingId']) {
+        this.meetingId.set(params['meetingId']);
+        this.loadMeetingData(params['meetingId']);
+      }
       if (params['title']) this.meetingTitle.set(params['title']);
     });
 
     await this.initDevices();
+  }
+
+  loadMeetingData(code: string) {
+    this.meetingService.getMeetingInfo(code).subscribe({
+      next: (info) => {
+        if (info.title) this.meetingTitle.set(info.title);
+        if (info.scheduledTime) this.meetingTime.set(info.scheduledTime);
+      },
+      error: (e) => console.error('Error fetching meeting info', e)
+    });
+    
+    this.meetingService.getActiveParticipants(code).subscribe({
+      next: (res) => this.activeParticipantsInfo.set(res),
+      error: (e) => console.error('Error fetching participants', e)
+    });
   }
 
   async initDevices() {
@@ -125,11 +144,34 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
 
   joinNow() {
     this.isJoining.set(true);
-    setTimeout(() => {
-      this.router.navigate(['/meeting-room'], {
-        queryParams: { meetingId: this.meetingId() }
-      });
-    }, 1200);
+    const code = this.meetingId();
+    if (!code) {
+      alert('Invalid Meeting ID');
+      this.isJoining.set(false);
+      return;
+    }
+
+    this.meetingService.joinMeeting({ meetingCode: code }).subscribe({
+      next: (res) => {
+        if (res.status === 'APPROVED') {
+          this.router.navigate(['/meeting-room'], {
+            queryParams: { meetingId: code }
+          });
+        } else if (res.status === 'WAITING') {
+          alert('Host has been notified. Please wait for approval to join.');
+          this.isJoining.set(false);
+          // TODO: Intercept WebSocket KNOCK notification loop here
+        } else {
+          alert('Request to join was rejected.');
+          this.isJoining.set(false);
+        }
+      },
+      error: (e) => {
+        console.error('Join error', e);
+        alert('Could not join meeting. Please check password or try again later.');
+        this.isJoining.set(false);
+      }
+    });
   }
 
   copyLink() {

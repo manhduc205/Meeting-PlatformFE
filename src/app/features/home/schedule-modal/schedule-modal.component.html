@@ -1,0 +1,92 @@
+<div class="modal-backdrop" (click)="close.emit()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    
+    <!-- Header Tools -->
+    <div class="modal-top-bar">
+      <div class="top-bar-icons">
+        <span class="material-symbols-outlined icon-btn">open_in_full</span>
+        <span class="material-symbols-outlined icon-btn" (click)="close.emit()">close</span>
+      </div>
+    </div>
+
+    <!-- Title Input -->
+    <div class="title-container">
+      <input type="text" class="meeting-title-input" [ngModel]="title()" (ngModelChange)="title.set($event)" />
+    </div>
+
+    <div class="form-body">
+      
+      <!-- Date & Time Row -->
+      <div class="form-group datetime-group">
+        <div class="dt-row">
+          <label class="checkbox-label">
+            <input type="checkbox" [ngModel]="useStartTime()" (ngModelChange)="useStartTime.set($event)" />
+            <span class="checkmark"></span>
+          </label>
+          <input type="date" class="form-input dt-picker" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" [disabled]="!useStartTime()" />
+          <input type="time" class="form-input dt-picker" [ngModel]="startTime()" (ngModelChange)="startTime.set($event)" [disabled]="!useStartTime()" />
+        </div>
+        
+        <div class="timezone-row">
+          <span class="tz-text">(GMT+07:00) Bangkok</span>
+          <span class="material-symbols-outlined tz-icon">expand_more</span>
+        </div>
+
+        <div class="repeat-row">
+          <span class="repeat-label">Repeat</span>
+          <div class="select-wrapper">
+            <select class="form-input">
+              <option>Never</option>
+              <option>Every Day</option>
+              <option>Every Week</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Invitees -->
+      <div class="form-group">
+        <label class="group-label">Invitees</label>
+        <input type="text" class="form-input w-full" placeholder="Add invitees" />
+      </div>
+
+      <!-- Security -->
+      <div class="form-group">
+        <label class="group-label">Meeting Security</label>
+        
+        <div class="security-item">
+          <label class="checkbox-label muted">
+            <input type="checkbox" checked disabled />
+            <span class="checkmark"></span>
+            Passcode
+          </label>
+          <div class="passcode-wrapper">
+            <input type="text" class="form-input passcode-input" [ngModel]="passcode()" (ngModelChange)="passcode.set($event)" />
+            <span class="material-symbols-outlined info-icon">info</span>
+          </div>
+        </div>
+        <p class="security-hint">Only users who have the invite link or passcode can join the meeting</p>
+
+        <div class="security-item mt-3">
+          <label class="checkbox-label">
+            <input type="checkbox" [ngModel]="waitingRoom()" (ngModelChange)="waitingRoom.set($event)" />
+            <span class="checkmark"></span>
+            Waiting Room
+          </label>
+        </div>
+        <p class="security-hint">Only users admitted by the host can join the meeting</p>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="modal-footer">
+      <a href="#" class="more-options-link" (click)="$event.preventDefault()">More Options</a>
+      <button class="save-btn" (click)="saveMeeting()" [disabled]="isSaving()">
+        <span *ngIf="!isSaving()">Save</span>
+        <span *ngIf="isSaving()" class="spinner"></span>
+      </button>
+    </div>
+
+  </div>
+</div>

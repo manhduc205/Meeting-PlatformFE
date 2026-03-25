@@ -1,15 +1,37 @@
 <div class="vc-root">
 
+  <!-- ===== CONNECTING OVERLAY ===== -->
+  <div class="vc-connecting" *ngIf="ms.connectionState() === 'connecting'">
+    <div class="connecting-card">
+      <div class="connecting-spinner"></div>
+      <h2>Joining meeting…</h2>
+      <p>{{ ms.meetingCode() }}</p>
+    </div>
+  </div>
+
+  <!-- ===== ERROR OVERLAY ===== -->
+  <div class="vc-connecting vc-error" *ngIf="ms.connectionState() === 'error'">
+    <div class="connecting-card">
+      <div class="error-icon">⚠️</div>
+      <h2>Could not connect</h2>
+      <p>Check that the backend and LiveKit server are running, then try again.</p>
+      <div class="left-actions">
+        <button class="rejoin-btn" (click)="ms.rejoin()">Retry</button>
+        <button class="home-btn" (click)="navigateHome()">Go Home</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== LEFT: Meeting view ===== -->
-  <ng-container *ngIf="!ms.hasLeft()">
+  <ng-container *ngIf="!ms.hasLeft() && ms.connectionState() === 'connected'">
 
     <!-- Top bar -->
     <app-top-bar
-      [meetingTitle]="'Product Review Q3'"
-      [meetingCode]="'856-3941-2204'"
-      [participantCount]="ms.participants().length"
-      [localUserName]="'Alex Morgan'"
-      [localUserInitials]="'AM'"
+      [meetingTitle]="ms.meetingTitle()"
+      [meetingCode]="ms.meetingCode()"
+      [participantCount]="ms.allParticipants().length"
+      [localUserName]="ms.localParticipant()?.name ?? ''"
+      [localUserInitials]="ms.localParticipant()?.initials ?? ''"
     ></app-top-bar>
 
     <!-- Main body -->
@@ -31,10 +53,10 @@
           {{ ms.toastMessage()?.text }}
         </div>
 
-        <!-- Video grid -->
+        <!-- Video grid — uses allParticipants (local + remote) -->
         <div class="vc-grid-wrapper">
           <app-video-grid
-            [participants]="ms.participants()"
+            [participants]="ms.allParticipants()"
             localParticipantId="local"
           ></app-video-grid>
         </div>
@@ -48,7 +70,7 @@
         <!-- Host Tools Panel -->
         <app-host-tools-panel
           *ngIf="ms.showHostTools()"
-          [participants]="ms.participants()"
+          [participants]="ms.allParticipants()"
           (closePanel)="ms.showHostTools.set(false)"
         ></app-host-tools-panel>
 
