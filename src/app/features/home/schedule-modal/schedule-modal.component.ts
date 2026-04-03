@@ -78,7 +78,7 @@ export class ScheduleModalComponent {
       next: (res: MeetingCreateResponse) => {
          this.isSaving.set(false);
          this.close.emit();
-         this.router.navigate(['/waiting-room'], { queryParams: { meetingId: res.meetingCode, title: res.title } });
+         this.router.navigate(['/meeting-room'], { queryParams: { meetingId: res.meetingCode, title: res.title } });
       },
       error: (e: any) => {
          console.error(e);

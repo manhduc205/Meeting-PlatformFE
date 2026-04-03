@@ -2,11 +2,12 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ScheduleModalComponent } from '../schedule-modal/schedule-modal.component';
+import { JoinMeetingModalComponent } from '../join-meeting-modal/join-meeting-modal.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, ScheduleModalComponent],
+  imports: [CommonModule, ScheduleModalComponent, JoinMeetingModalComponent],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
@@ -14,17 +15,20 @@ export class DashboardComponent {
   constructor(public router: Router) {}
 
   isScheduleModalOpen = false;
-
+  isJoinModalOpen = false;
   actionButtons = [
-    { icon: 'video_call', label: 'New Meeting', color: 'orange', route: 'waiting-room' },
-    { icon: 'add_box', label: 'Join', color: 'primary', route: 'waiting-room' },
+    { icon: 'video_call', label: 'New Meeting', color: 'orange', route: null },
+    { icon: 'add_box', label: 'Join', color: 'primary', route: null },
     { icon: 'calendar_month', label: 'Schedule', color: 'primary', route: null },
     { icon: 'present_to_all', label: 'Share Screen', color: 'primary', route: null },
   ];
-
   handleAction(btn: any) {
-    if (btn.label === 'Schedule') {
+    if (btn.label === 'Schedule' || btn.label === 'New Meeting') {
       this.isScheduleModalOpen = true;
+      return;
+    }
+    if (btn.label === 'Join') {
+      this.isJoinModalOpen = true;
       return;
     }
     if (btn.route) {

@@ -6,6 +6,7 @@ import {
   ViewChild,
   ElementRef,
   AfterViewInit,
+  AfterViewChecked,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Participant } from '../../models/meeting.model';
@@ -19,18 +20,24 @@ import { Participant } from '../../models/meeting.model';
       class="video-tile"
       [class.speaking]="participant.isSpeaking"
     >
-      <!-- ── Real <video> element (camera on & stream available) ── -->
+      <!--
+        FIX: <video> is ALWAYS in the DOM — no *ngIf.
+        Previously *ngIf destroyed the element on camera-off.
+        When camera turned back on, ngOnChanges fired BEFORE Angular
+        re-created the element, so videoEl was still undefined → stream never attached.
+        Solution: keep element alive, use CSS to hide/show.
+      -->
       <video
         #videoEl
-        *ngIf="participant.isCameraOn && participant.stream"
         class="tile-video"
         [class.mirrored]="isLocal"
+        [class.tile-video--hidden]="!participant.isCameraOn || !participant.stream"
         autoplay
         playsinline
         muted
       ></video>
 
-      <!-- ── Avatar fallback (camera off or no stream yet) ── -->
+      <!-- Avatar fallback (camera off or no stream yet) -->
       <div
         *ngIf="!participant.isCameraOn || !participant.stream"
         class="tile-avatar-bg"
@@ -45,7 +52,7 @@ import { Participant } from '../../models/meeting.model';
         <span class="tile-avatar-name">{{ participant.name }}</span>
       </div>
 
-      <!-- Speaking ring animation -->
+      <!-- Speaking ring -->
       <div class="speaking-ring" *ngIf="participant.isSpeaking"></div>
 
       <!-- Top-left: host badge -->
@@ -61,7 +68,7 @@ import { Participant } from '../../models/meeting.model';
       <!-- Top-right: raise hand badge -->
       <div class="raise-hand-badge" *ngIf="participant.isHandRaised">✋</div>
 
-      <!-- Top-right: camera off icon (only if hand NOT raised) -->
+      <!-- Top-right: camera off badge -->
       <div class="cam-off-badge" *ngIf="!participant.isCameraOn && !participant.isHandRaised">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2">
           <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10M1 1l22 22"/>
@@ -71,7 +78,7 @@ import { Participant } from '../../models/meeting.model';
       <!-- Bottom bar -->
       <div class="tile-bottom">
         <div class="tile-name-row">
-          <!-- Audio level bars (from LiveKit ActiveSpeakersChanged) -->
+          <!-- Audio level bars -->
           <div class="audio-bars" *ngIf="participant.isSpeaking && !participant.isMuted">
             <span class="bar" [style.height.px]="barHeight(0)"></span>
             <span class="bar" [style.height.px]="barHeight(1)"></span>
@@ -99,39 +106,66 @@ import { Participant } from '../../models/meeting.model';
   `,
   styleUrls: ['./video-tile.component.scss']
 })
-export class VideoTileComponent implements AfterViewInit, OnChanges {
+export class VideoTileComponent implements AfterViewInit, OnChanges, AfterViewChecked {
   @Input() participant!: Participant;
   @Input() isLocal = false;
 
-  @ViewChild('videoEl') videoEl?: ElementRef<HTMLVideoElement>;
+  /**
+   * FIX: @ViewChild now always resolves because <video> is always in the DOM.
+   * Previously, with *ngIf, videoEl was undefined when camera was off,
+   * causing _attachStream() to bail early and stream never being attached
+   * when camera turned back on.
+   */
+  @ViewChild('videoEl') videoEl!: ElementRef<HTMLVideoElement>;
+
+  private _needsAttach = false;
 
   ngAfterViewInit(): void {
     this._attachStream();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    // Re-attach whenever the stream reference changes
-    if (changes['participant'] && this.videoEl) {
+    if (changes['participant']) {
+      // Mark that we need to attach the stream.
+      // We use AfterViewChecked as a fallback in case videoEl isn't ready yet.
+      this._needsAttach = true;
       this._attachStream();
+    }
+  }
+
+  /**
+   * AfterViewChecked fires after every view update.
+   * This catches the case where ngOnChanges ran but videoEl wasn't ready yet.
+   */
+  ngAfterViewChecked(): void {
+    if (this._needsAttach && this.videoEl) {
+      this._attachStream();
+      this._needsAttach = false;
     }
   }
 
   private _attachStream(): void {
     const el = this.videoEl?.nativeElement;
     if (!el) return;
-    const stream = this.participant?.stream;
+
+    const stream = this.participant?.stream ?? null;
+
+    // Only update if stream reference actually changed — avoids unnecessary restarts
     if (el.srcObject !== stream) {
-      el.srcObject = stream ?? null;
-      if (stream) el.play().catch(() => {/* autoplay policy: muted allows it */});
+      el.srcObject = stream;
+      if (stream) {
+        el.play().catch(() => {/* autoplay policy: allowed because video is muted */});
+      }
     }
+
+    this._needsAttach = false;
   }
 
-  /** Map audio level (0-1) to animated bar heights (px) */
+  /** Map audio level (0–1) to animated bar heights (px) */
   barHeight(idx: number): number {
     const level = this.participant?.audioLevel ?? 0;
     const base = 3;
     const offsets = [0, Math.PI / 3, (2 * Math.PI) / 3];
-    // Clamp between 3 and 12 px
     return Math.max(base, Math.min(12, base + level * 9 * Math.abs(Math.sin(Date.now() / 150 + offsets[idx]))));
   }
 }

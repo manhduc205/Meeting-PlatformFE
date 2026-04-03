@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
-import { MeetingService, ActiveParticipantsResponse } from '../../core/services/meeting.service';
+import { SignalingService } from '../meeting-room/services/signaling.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-waiting-room',
@@ -22,21 +23,14 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
     return this.userSignal();
   }
 
-  meetingService = inject(MeetingService);
+  signalingService = inject(SignalingService);
+  private subs = new Subscription();
 
   meetingId = signal('');
-  meetingTitle = signal('Loading...');
-  meetingTime = signal('Loading schedules...');
-  
-  activeParticipantsInfo = signal<ActiveParticipantsResponse>({
-    totalCount: 0,
-    participants: [],
-    displayText: 'No participants yet'
-  });
+  meetingTitle = signal('Waiting Room');
 
   micOn = signal(true);
   camOn = signal(true);
-  isJoining = signal(false);
 
   copied = signal(false);
   private copyTimeout: any;
@@ -55,27 +49,36 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
     this.route.queryParams.subscribe(params => {
       if (params['meetingId']) {
         this.meetingId.set(params['meetingId']);
-        this.loadMeetingData(params['meetingId']);
+        
+        // Connect STOMP to listen for Host approval
+        const currentUser = this.user;
+        if (currentUser) {
+          this.signalingService.connect(this.meetingId(), currentUser.id);
+          this.subs.add(
+            this.signalingService.actions$.subscribe(msg => {
+              if (msg.type === 'APPROVED' || msg.type === 'ADMITTED') {
+                if (!msg.targetId || msg.targetId === currentUser.id || msg.payload?.['userId'] === currentUser.id) {
+                  this.router.navigate(['/meeting-room'], { queryParams: { meetingId: this.meetingId() }});
+                }
+              }
+            })
+          );
+          // Also listen to presence just in case Event is there
+          this.subs.add(
+            this.signalingService.presence$.subscribe(msg => {
+              if (msg.type === 'APPROVED' || msg.type === 'ADMITTED') {
+                if (!msg.targetId || msg.targetId === currentUser.id || msg.payload?.['userId'] === currentUser.id) {
+                  this.router.navigate(['/meeting-room'], { queryParams: { meetingId: this.meetingId() }});
+                }
+              }
+            })
+          );
+        }
       }
       if (params['title']) this.meetingTitle.set(params['title']);
     });
 
     await this.initDevices();
-  }
-
-  loadMeetingData(code: string) {
-    this.meetingService.getMeetingInfo(code).subscribe({
-      next: (info) => {
-        if (info.title) this.meetingTitle.set(info.title);
-        if (info.scheduledTime) this.meetingTime.set(info.scheduledTime);
-      },
-      error: (e) => console.error('Error fetching meeting info', e)
-    });
-    
-    this.meetingService.getActiveParticipants(code).subscribe({
-      next: (res) => this.activeParticipantsInfo.set(res),
-      error: (e) => console.error('Error fetching participants', e)
-    });
   }
 
   async initDevices() {
@@ -106,6 +109,8 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => track.stop());
     }
+    this.subs.unsubscribe();
+    this.signalingService.disconnect();
   }
 
   toggleMic() { 
@@ -142,37 +147,7 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  joinNow() {
-    this.isJoining.set(true);
-    const code = this.meetingId();
-    if (!code) {
-      alert('Invalid Meeting ID');
-      this.isJoining.set(false);
-      return;
-    }
-
-    this.meetingService.joinMeeting({ meetingCode: code }).subscribe({
-      next: (res) => {
-        if (res.status === 'APPROVED') {
-          this.router.navigate(['/meeting-room'], {
-            queryParams: { meetingId: code }
-          });
-        } else if (res.status === 'WAITING') {
-          alert('Host has been notified. Please wait for approval to join.');
-          this.isJoining.set(false);
-          // TODO: Intercept WebSocket KNOCK notification loop here
-        } else {
-          alert('Request to join was rejected.');
-          this.isJoining.set(false);
-        }
-      },
-      error: (e) => {
-        console.error('Join error', e);
-        alert('Could not join meeting. Please check password or try again later.');
-        this.isJoining.set(false);
-      }
-    });
-  }
+  // User waits for WebSocket event instead of joining explicitly
 
   copyLink() {
     const url = `${window.location.origin}/waiting-room?meetingId=${this.meetingId()}`;

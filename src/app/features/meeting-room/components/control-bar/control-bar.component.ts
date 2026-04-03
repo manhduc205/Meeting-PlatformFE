@@ -28,7 +28,7 @@ const REACTIONS = ['👍', '👏', '😂', '❤️', '🎉', '🤔', '👋'];
           class="ctrl-btn"
           [class.active]="!ms.isMuted()"
           [class.off]="ms.isMuted()"
-          (click)="ms.toggleMic()"
+          (click)="onMicClick()"
           title="{{ ms.isMuted() ? 'Unmute' : 'Mute' }}"
         >
           <span class="ctrl-icon-wrap">
@@ -57,7 +57,7 @@ const REACTIONS = ['👍', '👏', '😂', '❤️', '🎉', '🤔', '👋'];
           class="ctrl-btn"
           [class.active]="ms.isCameraOn()"
           [class.off]="!ms.isCameraOn()"
-          (click)="ms.toggleCamera()"
+          (click)="onCamClick()"
           title="{{ ms.isCameraOn() ? 'Stop Video' : 'Start Video' }}"
         >
           <span class="ctrl-icon-wrap">
@@ -84,7 +84,7 @@ const REACTIONS = ['👍', '👏', '😂', '❤️', '🎉', '🤔', '👋'];
         <button
           class="ctrl-btn"
           [class.active]="ms.isScreenSharing()"
-          (click)="ms.toggleScreenShare()"
+          (click)="onScreenShareClick()"
           title="{{ ms.isScreenSharing() ? 'Stop Share' : 'Share' }}"
         >
           <span class="ctrl-icon-wrap">
@@ -258,8 +258,12 @@ export class ControlBarComponent {
   reactions = REACTIONS;
   showMore = false;
 
-  pickReaction(emoji: string) {
-    this.ms.showReactions.set(false);
-    this.ms.showToast(`You reacted with ${emoji}`, 'info');
+  onMicClick(): void   { this.ms.toggleMic(); }
+  onCamClick(): void   { this.ms.toggleCamera(); }
+  onScreenShareClick() { this.ms.toggleScreenShare(); }
+
+  /** Send reaction via LiveKit DataChannel */
+  pickReaction(emoji: string): void {
+    this.ms.sendReaction(emoji);
   }
 }

@@ -1,12 +1,19 @@
-import { Injectable, signal, computed, inject, OnDestroy } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription } from 'rxjs';
 import { Participant, ChatMessage, Poll, SidebarTab } from '../models/meeting.model';
 import { SignalingService } from './signaling.service';
-import { MediaStreamService } from './media-stream.service';
+import { MediaStreamService, ReactionPayload, WhiteboardPayload, WhiteboardClearPayload } from './media-stream.service';
 import { AuthService } from '../../auth/auth.service';
 
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'error';
+
+export interface ReactionEvent {
+  emoji: string;
+  senderName: string;
+  senderId: string;
+  id: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class MeetingStateService {
@@ -20,11 +27,18 @@ export class MeetingStateService {
   meetingTitle = signal('Meeting');
   connectionState = signal<ConnectionState>('idle');
 
-  // ── UI signals (unchanged) ───────────────────────────────────────────────
-  participants = signal<Participant[]>([]);
-  isMuted = signal(false);
-  isCameraOn = signal(true);
+  // ── Local media state — optimistic update + event confirmation ────────────
+  /**
+   * Strategy: update signals IMMEDIATELY when button is pressed (optimistic),
+   * then confirm/correct via LiveKit events. This gives instant visual feedback.
+   * The event subscriptions also handle OS-level changes (hardware mute button).
+   */
+  isMuted = signal(false);       // true = mic OFF
+  isCameraOn = signal(true);     // true = camera ON
   isScreenSharing = signal(false);
+
+  // ── Other UI signals ─────────────────────────────────────────────────────
+  participants = signal<Participant[]>([]);
   isHandRaised = signal(false);
   sidebarTab = signal<SidebarTab | null>(null);
   messages = signal<ChatMessage[]>([]);
@@ -38,13 +52,18 @@ export class MeetingStateService {
   toastMessage = signal<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
   localStream = signal<MediaStream | null>(null);
 
+  // ── DataChannel event streams ────────────────────────────────────────────
+  readonly reaction$ = new Subject<ReactionEvent>();
+  readonly whiteboardDraw$ = new Subject<WhiteboardPayload>();
+  readonly whiteboardClear$ = new Subject<void>();
+
   readonly localParticipant = computed<Participant | null>(() => {
     const user = this.auth.getCurrentUser();
     if (!user) return null;
     return {
       id: 'local',
       name: user.name,
-      initials: user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
+      initials: user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
       avatarColor: '#4f46e5',
       isMuted: this.isMuted(),
       isCameraOn: this.isCameraOn(),
@@ -52,7 +71,9 @@ export class MeetingStateService {
       isSpeaking: false,
       isHandRaised: this.isHandRaised(),
       isLocal: true,
-      stream: this.localStream() ?? undefined,
+      isScreenSharing: this.isScreenSharing(),
+      // stream is null when camera is off → VideoTile shows avatar
+      stream: this.isCameraOn() ? (this.localStream() ?? undefined) : undefined,
     };
   });
 
@@ -63,6 +84,7 @@ export class MeetingStateService {
   });
 
   private subs = new Subscription();
+  private _reactionCounter = 0;
 
   // ── Join / Leave ─────────────────────────────────────────────────────────
 
@@ -72,6 +94,11 @@ export class MeetingStateService {
     this.connectionState.set('connecting');
     this.hasLeft.set(false);
 
+    // Reset media state
+    this.isMuted.set(false);
+    this.isCameraOn.set(true);
+    this.isScreenSharing.set(false);
+
     const user = this.auth.getCurrentUser();
     if (!user) {
       this.connectionState.set('error');
@@ -80,13 +107,8 @@ export class MeetingStateService {
     }
 
     try {
-      // Start STOMP connection in background — non-blocking
       this.signaling.connect(code, user.id);
-
-      // Connect to LiveKit SFU — this is the critical path
       await this.media.connect(code);
-
-      // LiveKit connected — UI is ready to show
       this.connectionState.set('connected');
     } catch (e) {
       console.error('[Meeting] Join failed', e);
@@ -95,21 +117,49 @@ export class MeetingStateService {
       return;
     }
 
-    // Sync remote participants from LiveKit
+    // ── Remote participants from LiveKit ──────────────────────────────────
     this.subs.add(
       this.media.participants$.subscribe(remotes => {
         this.participants.set(remotes);
       })
     );
 
-    // Sync local stream (for "You" tile)
+    // ── Local stream (video for "You" tile) ───────────────────────────────
     this.subs.add(
       this.media.localStream$.subscribe(stream => {
         this.localStream.set(stream);
       })
     );
 
-    // Incoming chat messages from STOMP
+    // ── LiveKit hardware events — used to correct state if OS overrides ────
+    // e.g. user presses hardware mute button, unplugs headset, etc.
+    // These run AFTER the optimistic update, so they only matter for hardware events.
+    this.subs.add(
+      this.media.isMicEnabled$.subscribe(enabled => {
+        this.isMuted.set(!enabled);
+      })
+    );
+
+    this.subs.add(
+      this.media.isCameraEnabled$.subscribe(enabled => {
+        this.isCameraOn.set(enabled);
+      })
+    );
+
+    this.subs.add(
+      this.media.isScreenSharing$.subscribe(sharing => {
+        this.isScreenSharing.set(sharing);
+      })
+    );
+
+    // ── DataChannel messages ──────────────────────────────────────────────
+    this.subs.add(
+      this.media.dataReceived$.subscribe(({ payload, participantIdentity }) => {
+        this._handleDataMessage(payload, participantIdentity);
+      })
+    );
+
+    // ── STOMP: chat + meeting control ─────────────────────────────────────
     this.subs.add(
       this.signaling.actions$.subscribe(msg => {
         if (msg.type === 'CHAT') {
@@ -135,6 +185,23 @@ export class MeetingStateService {
     );
   }
 
+  private _handleDataMessage(payload: any, participantIdentity: string): void {
+    if (!payload?.type) return;
+    switch (payload.type as string) {
+      case 'REACTION': {
+        const r = payload as ReactionPayload;
+        this.reaction$.next({ emoji: r.emoji, senderName: r.senderName, senderId: r.senderId, id: ++this._reactionCounter });
+        break;
+      }
+      case 'WHITEBOARD_DRAW':
+        this.whiteboardDraw$.next(payload as WhiteboardPayload);
+        break;
+      case 'WHITEBOARD_CLEAR':
+        this.whiteboardClear$.next();
+        break;
+    }
+  }
+
   async cleanupMedia(): Promise<void> {
     this.subs.unsubscribe();
     this.subs = new Subscription();
@@ -145,26 +212,67 @@ export class MeetingStateService {
     this.connectionState.set('idle');
   }
 
-  // ── Controls ─────────────────────────────────────────────────────────────
+  // ── Controls — Optimistic update + SDK call + rollback on error ───────────
 
+  /**
+   * Mic toggle:
+   * 1. Flip isMuted signal immediately → icon changes at once
+   * 2. Tell LiveKit SDK the new state
+   * 3. If SDK throws, rollback the signal
+   */
   async toggleMic(): Promise<void> {
-    const next = !this.isMuted();
-    this.isMuted.set(next);
-    await this.media.toggleMic(!next);
-    this.showToast(next ? 'Microphone muted' : 'Microphone unmuted', 'info');
+    const wasМuted = this.isMuted();
+    const nextEnabled = wasМuted; // if was muted, next = enable mic
+    this.isMuted.set(!nextEnabled); // optimistic
+    try {
+      await this.media.setMicEnabled(nextEnabled);
+      this.showToast(nextEnabled ? 'Microphone unmuted' : 'Microphone muted', 'info');
+    } catch {
+      this.isMuted.set(wasМuted); // rollback
+      this.showToast('Could not toggle microphone', 'error');
+    }
   }
 
+  /**
+   * Camera toggle:
+   * 1. Flip isCameraOn signal immediately → avatar/video switches at once
+   * 2. Clear localStream if turning off → avatar shows without waiting for event
+   * 3. Tell LiveKit SDK the new state
+   * 4. If SDK throws, rollback
+   */
   async toggleCamera(): Promise<void> {
-    const next = !this.isCameraOn();
-    this.isCameraOn.set(next);
-    await this.media.toggleCamera(next);
-    this.showToast(next ? 'Camera started' : 'Camera stopped', 'info');
+    const wasOn = this.isCameraOn();
+    const nextOn = !wasOn;
+    this.isCameraOn.set(nextOn); // optimistic
+
+    if (!nextOn) {
+      // Camera going off: clear stream NOW so avatar appears immediately
+      this.localStream.set(null);
+    }
+
+    try {
+      await this.media.setCameraEnabled(nextOn);
+      this.showToast(nextOn ? 'Camera started' : 'Camera stopped', 'info');
+    } catch {
+      // Rollback
+      this.isCameraOn.set(wasOn);
+      if (!nextOn) {
+        // restore stream from SDK (camera is still on)
+        // localStream will update via localStream$ subscription
+      }
+      this.showToast('No camera found or permission denied', 'error');
+    }
   }
 
   async toggleScreenShare(): Promise<void> {
-    this.isScreenSharing.update(v => !v);
-    await this.media.toggleScreenShare(this.isScreenSharing());
-    this.showToast(this.isScreenSharing() ? 'Screen sharing started' : 'Screen sharing stopped', 'info');
+    const wasSharing = this.isScreenSharing();
+    const nextSharing = !wasSharing;
+    try {
+      await this.media.setScreenShareEnabled(nextSharing);
+      this.showToast(nextSharing ? 'Screen sharing started' : 'Screen sharing stopped', 'info');
+    } catch {
+      // Screen share cancelled by user (rejected picker) — not an error
+    }
   }
 
   toggleHand(): void {
@@ -172,24 +280,22 @@ export class MeetingStateService {
     this.showToast(this.isHandRaised() ? '✋ Hand raised' : 'Hand lowered', 'info');
   }
 
+  // ── Reactions ─────────────────────────────────────────────────────────────
+
+  sendReaction(emoji: string): void {
+    this.showReactions.set(false);
+    this.media.sendReaction(emoji);
+  }
+
   // ── Chat ─────────────────────────────────────────────────────────────────
 
   sendMessage(text: string): void {
     const user = this.auth.getCurrentUser();
     if (!user) return;
-    // Optimistically add to local list
     this.messages.update(prev => [
       ...prev,
-      {
-        id: `m-${Date.now()}`,
-        senderId: 'local',
-        senderName: user.name,
-        text,
-        timestamp: new Date(),
-        isMe: true,
-      },
+      { id: `m-${Date.now()}`, senderId: 'local', senderName: user.name, text, timestamp: new Date(), isMe: true },
     ]);
-    // Broadcast via STOMP
     this.signaling.sendChat(this.meetingCode(), user.id, text);
   }
 
@@ -240,14 +346,7 @@ export class MeetingStateService {
     this.polls.update(prev =>
       prev.map(p =>
         p.id === pollId
-          ? {
-              ...p,
-              votedOption: optionId,
-              totalVotes: p.totalVotes + 1,
-              options: p.options.map(o =>
-                o.id === optionId ? { ...o, votes: o.votes + 1 } : o
-              ),
-            }
+          ? { ...p, votedOption: optionId, totalVotes: p.totalVotes + 1, options: p.options.map(o => o.id === optionId ? { ...o, votes: o.votes + 1 } : o) }
           : p
       )
     );

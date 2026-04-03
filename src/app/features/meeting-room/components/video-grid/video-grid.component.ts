@@ -5,12 +5,6 @@ import { Participant } from '../../models/meeting.model';
 
 const PAGE_SIZE = 9;
 
-/**
- * For N tiles per page, compute how many columns/rows to use.
- * If some slots are left empty (e.g. 8 participants on a 9-slot page),
- * the two participants that start a new column get a bigger tile via
- * a special CSS class. We implement this by using a CSS-grid trick.
- */
 function getGridConfig(count: number): { cols: number; rows: number } {
   if (count === 1) return { cols: 1, rows: 1 };
   if (count === 2) return { cols: 2, rows: 1 };
@@ -66,6 +60,15 @@ function getGridConfig(count: number): { cols: number; rows: number } {
   styleUrls: ['./video-grid.component.scss']
 })
 export class VideoGridComponent {
+  /**
+   * FIX: _participants is now a Signal (was plain property).
+   * Angular computed() only tracks Signal dependencies.
+   * With a plain property, currentPageParticipants() would cache stale data
+   * and never re-run when camera state / stream changed.
+   */
+  private _participants = signal<Participant[]>([]);
+  private _currentPage = signal(0);
+
   @Input() set participants(value: Participant[]) {
     // Sort: camera-on first, then speaking, then host
     const sorted = [...value].sort((a, b) => {
@@ -74,8 +77,8 @@ export class VideoGridComponent {
       if (a.isHost !== b.isHost) return a.isHost ? -1 : 1;
       return 0;
     });
-    this._participants = sorted;
-    // Reset to page 0 if current page is out of range
+    this._participants.set(sorted);   // ← signal.set() triggers computed invalidation
+    // Reset page if out of range
     const total = Math.ceil(sorted.length / PAGE_SIZE);
     if (this._currentPage() >= total) {
       this._currentPage.set(Math.max(0, total - 1));
@@ -83,18 +86,15 @@ export class VideoGridComponent {
   }
   @Input() localParticipantId = 'local';
 
-  private _participants: Participant[] = [];
-  private _currentPage = signal(0);
-
   currentPage = this._currentPage.asReadonly();
 
-  totalPages = computed(() => Math.max(1, Math.ceil(this._participants.length / PAGE_SIZE)));
+  totalPages = computed(() => Math.max(1, Math.ceil(this._participants().length / PAGE_SIZE)));
 
   pageArray = computed(() => Array.from({ length: this.totalPages() }));
 
   currentPageParticipants = computed(() => {
     const start = this._currentPage() * PAGE_SIZE;
-    return this._participants.slice(start, start + PAGE_SIZE);
+    return this._participants().slice(start, start + PAGE_SIZE);
   });
 
   gridStyle = computed(() => {
@@ -106,26 +106,13 @@ export class VideoGridComponent {
     };
   });
 
-  /**
-   * When exactly 8 participants are on a page, the first 2 tiles get
-   * a row-span-2 treatment to fill the empty 9th slot.
-   */
   isFeatured(index: number): boolean {
-    const count = this.currentPageParticipants().length;
-    return count === 8 && index < 2;
+    return this.currentPageParticipants().length === 8 && index < 2;
   }
 
-  prevPage() {
-    if (this._currentPage() > 0) this._currentPage.set(this._currentPage() - 1);
-  }
-
-  nextPage() {
-    if (this._currentPage() < this.totalPages() - 1) this._currentPage.set(this._currentPage() + 1);
-  }
-
-  goToPage(i: number) {
-    this._currentPage.set(i);
-  }
+  prevPage() { if (this._currentPage() > 0) this._currentPage.update(v => v - 1); }
+  nextPage() { if (this._currentPage() < this.totalPages() - 1) this._currentPage.update(v => v + 1); }
+  goToPage(i: number) { this._currentPage.set(i); }
 
   trackById(_: number, p: Participant) { return p.id; }
 }

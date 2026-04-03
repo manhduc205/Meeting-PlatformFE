@@ -1,0 +1,67 @@
+<div class="modal-backdrop" (click)="close.emit()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="modal-top-bar">
+      <div class="top-bar-icons">
+        <span class="material-symbols-outlined icon-btn" (click)="close.emit()">close</span>
+      </div>
+    </div>
+    
+    <div class="title-container">
+      <h2 class="modal-title">Join Meeting</h2>
+      <p class="modal-subtitle">Enter the meeting code and password to join</p>
+    </div>
+
+    <!-- Body -->
+    <form class="form-body" [formGroup]="joinForm" (ngSubmit)="onSubmit()">
+      
+      <div class="form-group">
+        <label class="group-label">Meeting Code</label>
+        <input 
+          type="text" 
+          class="form-input w-full" 
+          formControlName="meetingCode" 
+          placeholder="e.g. 123-456-7890"
+          [class.is-invalid]="joinForm.get('meetingCode')?.invalid && joinForm.get('meetingCode')?.touched"
+        />
+        <div class="error-text" *ngIf="joinForm.get('meetingCode')?.invalid && joinForm.get('meetingCode')?.touched">
+          Please enter a valid meeting code.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="group-label">Password</label>
+        <div class="input-wrapper">
+          <input 
+            [type]="showPassword ? 'text' : 'password'" 
+            class="form-input w-full pe-10" 
+            formControlName="password" 
+            placeholder="Enter meeting password"
+            [class.is-invalid]="joinForm.get('password')?.invalid && joinForm.get('password')?.touched"
+          />
+          <button type="button" class="toggle-password-btn" (click)="togglePasswordVisibility()">
+            <span class="material-symbols-outlined">{{ showPassword ? 'visibility_off' : 'visibility' }}</span>
+          </button>
+        </div>
+        <div class="error-text" *ngIf="joinForm.get('password')?.invalid && joinForm.get('password')?.touched">
+          Password is required.
+        </div>
+      </div>
+
+      <div class="error-alert" *ngIf="errorMessage">
+        <span class="material-symbols-outlined">error</span>
+        {{ errorMessage }}
+      </div>
+
+      <!-- Footer action inside form so Enter works to submit -->
+      <div class="modal-footer">
+        <button type="button" class="cancel-btn" (click)="close.emit()" [disabled]="isJoining">Cancel</button>
+        <button type="submit" class="join-btn" [disabled]="isJoining">
+          <span *ngIf="isJoining" class="spinner"></span>
+          <span *ngIf="!isJoining">Join</span>
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>

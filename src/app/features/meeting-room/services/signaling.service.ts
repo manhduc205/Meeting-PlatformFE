@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
+import { AuthService } from '../../auth/auth.service';
 
 /** Matches the backend SignalingMessage DTO */
 export interface SignalingMessage {
@@ -22,6 +23,8 @@ export class SignalingService {
   private _presence$ = new Subject<SignalingMessage>();
   private _actions$ = new Subject<SignalingMessage>();
 
+  private authService = inject(AuthService);
+
   /** Emits true once STOMP is fully connected */
   readonly connected$ = this._connected$.asObservable();
   /** Room-wide presence events (JOIN, LEAVE, USER_LIST_SYNC, RECONNECTING) */
@@ -29,17 +32,31 @@ export class SignalingService {
   /** Room-wide action events (CHAT, MEETING_ENDED, …) */
   readonly actions$: Observable<SignalingMessage> = this._actions$.asObservable();
 
-  connect(meetingCode: string, senderId: string): void {
+  async connect(meetingCode: string, senderId: string): Promise<void> {
+    const token = await this.authService.getToken();
+
     this.client = new Client({
       brokerURL: 'ws://localhost:8081/ws/meeting/websocket',
+      connectHeaders: {
+        Authorization: `Bearer ${token}`
+      },
       webSocketFactory: () => {
         // SockJS fallback
         const SockJS = (window as any).SockJS;
-        if (SockJS) return new SockJS('http://localhost:8081/ws/meeting');
-        return new WebSocket('ws://localhost:8081/ws/meeting/websocket');
+        if (SockJS) return new SockJS(`http://localhost:8081/ws/meeting?access_token=${token}`);
+        return new WebSocket(`ws://localhost:8081/ws/meeting/websocket?access_token=${token}`);
       },
       // Exponential backoff: 1s → 2s → 4s → … up to 30 s
       reconnectDelay: 1000,
+      beforeConnect: () => {
+        return new Promise<void>(async (resolve) => {
+          const freshToken = await this.authService.getToken();
+          this.client.connectHeaders = {
+            Authorization: `Bearer ${freshToken}`
+          };
+          resolve();
+        });
+      },
       onConnect: () => {
         this._connected$.next(true);
         this._subscribe(meetingCode, senderId);

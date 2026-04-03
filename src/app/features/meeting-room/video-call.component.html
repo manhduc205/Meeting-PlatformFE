@@ -46,6 +46,18 @@
           You are sharing your screen
         </div>
 
+        <!-- ===== REACTION ANIMATION OVERLAY ===== -->
+        <div class="reaction-overlay" aria-hidden="true">
+          <div
+            *ngFor="let r of floatingReactions()"
+            class="reaction-particle"
+            [style.left.%]="r.xOffset"
+          >
+            <span class="reaction-emoji">{{ r.emoji }}</span>
+            <span class="reaction-sender">{{ r.senderName }}</span>
+          </div>
+        </div>
+
         <!-- Toast notification -->
         <div class="vc-toast" *ngIf="ms.toastMessage()"
              [class.toast-success]="ms.toastMessage()?.type === 'success'"

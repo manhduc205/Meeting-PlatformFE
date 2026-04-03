@@ -130,24 +130,6 @@
             </div>
 
             <h2 class="meeting-title">{{ meetingTitle() }}</h2>
-            <div class="meeting-time">
-              <span class="material-symbols-outlined">calendar_today</span>
-              <span>{{ meetingTime() }}</span>
-            </div>
-
-            <!-- Participants -->
-            <div class="participants-section">
-              <p class="section-label">Participants ({{ activeParticipantsInfo().totalCount }})</p>
-              <div class="avatar-stack">
-                <img *ngFor="let p of activeParticipantsInfo().participants" 
-                     [src]="p.avatarUrl || ('https://ui-avatars.com/api/?name=' + p.firstName + '&background=2d6ef7&color=fff')" 
-                     [alt]="p.firstName" class="p-avatar" />
-                <div class="p-avatar extra" *ngIf="activeParticipantsInfo().totalCount > activeParticipantsInfo().participants.length">
-                  +{{ activeParticipantsInfo().totalCount - activeParticipantsInfo().participants.length }}
-                </div>
-              </div>
-              <p class="participant-names">{{ activeParticipantsInfo().displayText }}</p>
-            </div>
 
             <!-- Info banner -->
             <div class="info-banner">
@@ -158,18 +140,10 @@
               </div>
             </div>
 
-            <!-- CTA buttons -->
-            <div class="cta-section">
-              <button class="btn-join" (click)="joinNow()" [class.loading]="isJoining()">
-                <ng-container *ngIf="!isJoining()">
-                  Join Now
-                  <span class="material-symbols-outlined">login</span>
-                </ng-container>
-                <ng-container *ngIf="isJoining()">
-                  <span class="spinner"></span> Joining...
-                </ng-container>
-              </button>
-              <button class="btn-later">Schedule for Later</button>
+            <!-- CTA section -->
+            <div class="cta-section waiting-status" style="display: flex; align-items: center; justify-content: center; background: #f3f4f6; padding: 16px; border-radius: 8px; color: #1f2937; font-weight: 500; font-size: 15px; margin-top: 20px;">
+              <span class="spinner" style="border-top-color: #0d59f2; border-right-color: #0d59f2; border-bottom-color: rgba(13, 89, 242, 0.2); border-left-color: rgba(13, 89, 242, 0.2); margin-right: 12px; width: 20px; height: 20px;"></span>
+              Please wait, the meeting host will let you in soon.
             </div>
           </div>
 

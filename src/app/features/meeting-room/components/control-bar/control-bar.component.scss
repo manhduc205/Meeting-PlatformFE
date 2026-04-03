@@ -154,6 +154,16 @@
     background: rgba(139, 92, 246, 0.2);
     color: #a78bfa;
   }
+
+  &.pending {
+    opacity: 0.5;
+    cursor: wait;
+    pointer-events: none;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
 }
 
 .ctrl-divider {

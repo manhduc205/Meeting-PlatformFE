@@ -56,6 +56,13 @@
   &.mirrored {
     transform: scaleX(-1);
   }
+
+  // Hidden state: camera off or stream not yet available.
+  // Uses display:none to hide — keeps element in DOM so @ViewChild stays valid
+  // and the stream can be re-attached when camera turns back on.
+  &.tile-video--hidden {
+    display: none;
+  }
 }
 
 // Audio level bars — animated from LiveKit audioLevel
