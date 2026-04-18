@@ -171,9 +171,34 @@ export class WhiteboardComponent implements AfterViewInit, OnInit, OnDestroy {
 
   ngAfterViewInit(): void {
     const canvas = this.canvasRef.nativeElement;
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    // Initial size
+    this._resizeCanvas(canvas);
     this._fillBackground();
+
+    // When parent removes [hidden], canvas goes from 0x0 → full size.
+    // Use ResizeObserver to detect that moment and re-initialize properly.
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        if (canvas.offsetWidth > 0 && canvas.offsetHeight > 0) {
+          // Save current drawing
+          let saved: ImageData | null = null;
+          try { saved = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height); } catch {}
+          this._resizeCanvas(canvas);
+          if (saved && saved.width > 0 && saved.height > 0) {
+            canvas.getContext('2d')!.putImageData(saved, 0, 0);
+          } else {
+            this._fillBackground();
+          }
+        }
+      });
+      ro.observe(canvas.parentElement!);
+      this.subs.add({ unsubscribe: () => ro.disconnect() });
+    }
+  }
+
+  private _resizeCanvas(canvas: HTMLCanvasElement): void {
+    canvas.width = canvas.offsetWidth || canvas.parentElement?.offsetWidth || 800;
+    canvas.height = canvas.offsetHeight || canvas.parentElement?.offsetHeight || 500;
   }
 
   ngOnDestroy(): void {

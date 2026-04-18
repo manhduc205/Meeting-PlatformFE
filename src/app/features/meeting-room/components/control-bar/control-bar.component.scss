@@ -104,6 +104,7 @@
       }
     }
 
+    // Badge (default: blue — unread chat count)
     .ctrl-badge {
       position: absolute;
       top: -5px;
@@ -119,6 +120,18 @@
       align-items: center;
       justify-content: center;
       padding: 0 2px;
+    }
+
+    // Amber badge variant (raised hands count)
+    .ctrl-badge--amber {
+      background: #f59e0b;
+      color: #000;
+      animation: badgePop 0.3s ease-out;
+    }
+
+    @keyframes badgePop {
+      0%   { transform: scale(1.5); }
+      100% { transform: scale(1); }
     }
   }
 
@@ -136,6 +149,58 @@
   &.active {
     background: rgba(255, 255, 255, 0.15);
     color: #fff;
+  }
+
+  // Hand raised: amber glow to draw attention
+  &.hand-raised {
+    background: rgba(245, 158, 11, 0.2) !important;
+    color: #fbbf24 !important;
+
+    .ctrl-icon-wrap svg {
+      animation: handWave 1.2s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+  }
+
+  @keyframes handWave {
+    0%, 100% { transform: rotate(0deg); }
+    25%  { transform: rotate(20deg); }
+    75%  { transform: rotate(-15deg); }
+  }
+
+  // Host hands-alert button: pulsing amber when participants have raised hands
+  &.ctrl-btn--hands-alert {
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      animation: handsAlertPulse 1.8s ease-in-out infinite;
+    }
+
+    &.active { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+  }
+
+  @keyframes handsAlertPulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.04); }
+  }
+
+  // Waiting room alert: subtle amber glow when people are waiting
+  &.waiting-alert {
+    color: #fbbf24;
+    position: relative;
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      border: 1px solid rgba(251, 191, 36, 0.5);
+      animation: handsAlertPulse 2s ease-in-out infinite;
+    }
   }
 
   .icon-red {

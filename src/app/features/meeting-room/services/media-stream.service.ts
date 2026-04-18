@@ -305,17 +305,20 @@ export class MediaStreamService {
 
   private _syncParticipants(): void {
     const remotes: Participant[] = Array.from(this.room.remoteParticipants.values()).map(rp => {
-      const videoTrack = rp.getTrackPublication(Track.Source.Camera)?.videoTrack;
-      const stream = videoTrack ? videoTrack.mediaStream ?? undefined : undefined;
+      // Ưu tiên lấy luồng ScreenShare nếu có, nếu không lấy Camera
+      const screenTrack = rp.getTrackPublication(Track.Source.ScreenShare)?.videoTrack;
+      const camTrack = rp.getTrackPublication(Track.Source.Camera)?.videoTrack;
+      const activeVideoTrack = screenTrack || camTrack;
+      const stream = activeVideoTrack ? activeVideoTrack.mediaStream ?? undefined : undefined;
 
       return {
         id: rp.identity,
-        name: rp.name || rp.identity,
-        initials: initialsFor(rp.name || rp.identity),
+        name: rp.identity, // Tên tạm sẽ được MeetingStateService override bằng FullName
+        initials: initialsFor(rp.identity),
         avatarColor: colorFor(rp.identity),
         isMuted: !rp.isMicrophoneEnabled,
-        isCameraOn: rp.isCameraEnabled,
-        isHost: rp.permissions?.canPublish ?? false,
+        isCameraOn: rp.isCameraEnabled || !!screenTrack, // Hiển thị Video Component nếu share màn hình
+        isHost: false, // Override later by MeetingStateService
         isSpeaking: rp.isSpeaking,
         isHandRaised: false,
         isScreenSharing: rp.isScreenShareEnabled,

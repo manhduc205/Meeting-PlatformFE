@@ -1,10 +1,12 @@
-import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, ElementRef, ViewChild, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import { SignalingService } from '../meeting-room/services/signaling.service';
+import { MeetingService } from '../../core/services/meeting.service';
 import { Subscription } from 'rxjs';
+import { Client, IMessage } from '@stomp/stompjs';
 
 @Component({
   selector: 'app-waiting-room',
@@ -17,17 +19,22 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
   @ViewChild('videoElement') videoElement!: ElementRef<HTMLVideoElement>;
 
   authService = inject(AuthService);
+  meetingService = inject(MeetingService);
   userSignal = this.authService.getUserSignal();
 
-  get user() {
-    return this.userSignal();
+  get user() { return this.userSignal(); }
+
+  /** Safe user initial — logic in TS avoids Angular strict-template warnings */
+  get userInitial(): string {
+    const name = this.user?.name;
+    return name ? name.charAt(0).toUpperCase() : 'U';
   }
 
-  signalingService = inject(SignalingService);
   private subs = new Subscription();
+  private stompClient: Client | null = null;
 
   meetingId = signal('');
-  meetingTitle = signal('Waiting Room');
+  meetingTitle = signal('Meeting');
 
   micOn = signal(true);
   camOn = signal(true);
@@ -42,38 +49,18 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
   selectedMicId: string = '';
   selectedCameraId: string = '';
 
+  // ── Join flow state ────────────────────────────────────────────────────────
+  joinStatus = signal<'IDLE' | 'JOINING' | 'WAITING' | 'APPROVED' | 'ERROR'>('IDLE');
+  waitingMessage = signal('Host đã nhận được yêu cầu. Vui lòng đợi trong giây lát...');
+  meetingPassword = '';
+  showPasswordField = signal(false);
+
   constructor(private route: ActivatedRoute, private router: Router) {}
 
   async ngOnInit() {
-    // Read query params when coming from join meeting link/form
-    this.route.queryParams.subscribe(params => {
+    this.route.queryParams.subscribe(async params => {
       if (params['meetingId']) {
         this.meetingId.set(params['meetingId']);
-        
-        // Connect STOMP to listen for Host approval
-        const currentUser = this.user;
-        if (currentUser) {
-          this.signalingService.connect(this.meetingId(), currentUser.id);
-          this.subs.add(
-            this.signalingService.actions$.subscribe(msg => {
-              if (msg.type === 'APPROVED' || msg.type === 'ADMITTED') {
-                if (!msg.targetId || msg.targetId === currentUser.id || msg.payload?.['userId'] === currentUser.id) {
-                  this.router.navigate(['/meeting-room'], { queryParams: { meetingId: this.meetingId() }});
-                }
-              }
-            })
-          );
-          // Also listen to presence just in case Event is there
-          this.subs.add(
-            this.signalingService.presence$.subscribe(msg => {
-              if (msg.type === 'APPROVED' || msg.type === 'ADMITTED') {
-                if (!msg.targetId || msg.targetId === currentUser.id || msg.payload?.['userId'] === currentUser.id) {
-                  this.router.navigate(['/meeting-room'], { queryParams: { meetingId: this.meetingId() }});
-                }
-              }
-            })
-          );
-        }
       }
       if (params['title']) this.meetingTitle.set(params['title']);
     });
@@ -83,25 +70,28 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
 
   async initDevices() {
     try {
-      // Prompt for permission first so devices can be enumerated with labels
       this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       if (this.videoElement) {
         this.videoElement.nativeElement.srcObject = this.localStream;
       }
-      
       const devices = await navigator.mediaDevices.enumerateDevices();
       this.microphones = devices.filter(d => d.kind === 'audioinput');
       this.cameras = devices.filter(d => d.kind === 'videoinput');
-
       if (this.microphones.length > 0) this.selectedMicId = this.microphones[0].deviceId;
       if (this.cameras.length > 0) this.selectedCameraId = this.cameras[0].deviceId;
-
       this.updateTracksState();
     } catch (err) {
-      console.error('Error accessing hardware devices: ', err);
+      console.error('Error accessing hardware devices:', err);
       this.micOn.set(false);
       this.camOn.set(false);
     }
+
+    // Attach stream if videoElement is ready (may be called after change detection)
+    setTimeout(() => {
+      if (this.videoElement && this.localStream) {
+        this.videoElement.nativeElement.srcObject = this.localStream;
+      }
+    }, 300);
   }
 
   ngOnDestroy() {
@@ -110,16 +100,16 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
       this.localStream.getTracks().forEach(track => track.stop());
     }
     this.subs.unsubscribe();
-    this.signalingService.disconnect();
+    this._disconnectStomp();
   }
 
-  toggleMic() { 
-    this.micOn.update(v => !v); 
+  toggleMic() {
+    this.micOn.update(v => !v);
     this.updateTracksState();
   }
-  
-  toggleCam() { 
-    this.camOn.update(v => !v); 
+
+  toggleCam() {
+    this.camOn.update(v => !v);
     this.updateTracksState();
   }
 
@@ -131,7 +121,7 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
 
   async onDeviceChange() {
     if (this.localStream) {
-       this.localStream.getTracks().forEach(t => t.stop());
+      this.localStream.getTracks().forEach(t => t.stop());
     }
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({
@@ -147,7 +137,102 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  // User waits for WebSocket event instead of joining explicitly
+  // ── Join Meeting Flow ──────────────────────────────────────────────────────
+
+  joinMeeting() {
+    const code = this.meetingId();
+    if (!code) return;
+
+    this.joinStatus.set('JOINING');
+
+    this.meetingService.joinMeeting({
+      meetingCode: code,
+      meetingPassword: this.meetingPassword || undefined
+    }).subscribe({
+      next: (response) => {
+        if (response.status === 'APPROVED') {
+          this.joinStatus.set('APPROVED');
+          this._navigateToRoom();
+        } else if (response.status === 'WAITING') {
+          this.joinStatus.set('WAITING');
+          if (response.message) {
+            this.waitingMessage.set(response.message);
+          }
+          this._subscribeToWaitingRoomWS(code);
+        } else if (response.status === 'REJECTED') {
+          this.joinStatus.set('ERROR');
+        }
+      },
+      error: (err) => {
+        console.error('Join meeting error:', err);
+        if (err.status === 401) {
+          this.showPasswordField.set(true);
+        }
+        this.joinStatus.set('IDLE');
+      }
+    });
+  }
+
+  private _subscribeToWaitingRoomWS(code: string) {
+    const authService = this.authService;
+    authService.getToken().then(token => {
+      this.stompClient = new Client({
+        webSocketFactory: () => {
+          const SockJS = (window as any).SockJS;
+          if (SockJS) return new SockJS(`http://localhost:8081/ws/meeting?access_token=${token}`);
+          return new WebSocket(`ws://localhost:8081/ws/meeting/websocket?access_token=${token}`);
+        },
+        connectHeaders: { Authorization: `Bearer ${token}` },
+        reconnectDelay: 2000,
+        onConnect: () => {
+          this.stompClient!.subscribe(
+            `/topic/meeting.${code}.waiting-room`,
+            (msg: IMessage) => {
+              try {
+                const body = JSON.parse(msg.body);
+                const currentUser = this.user;
+                // Check if this approval is for the current user
+                if (
+                  body.type === 'PARTICIPANT_APPROVED' &&
+                  (!body.userId || body.userId === currentUser?.id)
+                ) {
+                  this.joinStatus.set('APPROVED');
+                  this._navigateToRoom();
+                } else if (
+                  body.type === 'PARTICIPANT_REJECTED' &&
+                  (!body.userId || body.userId === currentUser?.id)
+                ) {
+                  this.joinStatus.set('ERROR');
+                }
+              } catch (e) {
+                console.warn('Failed to parse waiting-room WS payload', e);
+              }
+            }
+          );
+        },
+        onStompError: (frame) => console.error('[WR-STOMP] error', frame),
+      });
+      this.stompClient.activate();
+    });
+  }
+
+  private _disconnectStomp() {
+    if (this.stompClient?.active) {
+      this.stompClient.deactivate();
+    }
+  }
+
+  private _navigateToRoom() {
+    // Stop local stream before entering the room (LiveKit will handle its own)
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => track.stop());
+    }
+    setTimeout(() => {
+      this.router.navigate(['/meeting-room'], {
+        queryParams: { meetingId: this.meetingId(), title: this.meetingTitle() }
+      });
+    }, 350);
+  }
 
   copyLink() {
     const url = `${window.location.origin}/waiting-room?meetingId=${this.meetingId()}`;
@@ -155,5 +240,9 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
       this.copied.set(true);
       this.copyTimeout = setTimeout(() => this.copied.set(false), 2000);
     });
+  }
+
+  goBack() {
+    this.router.navigate(['/']);
   }
 }

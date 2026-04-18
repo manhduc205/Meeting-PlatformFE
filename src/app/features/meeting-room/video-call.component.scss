@@ -17,6 +17,13 @@
   min-height: 0;
 }
 
+// Ensure the top-bar component wrapper is elevated above vc-body
+app-top-bar {
+  position: relative;
+  z-index: 60;
+  display: block;
+}
+
 .vc-video-area {
   flex: 1;
   position: relative;

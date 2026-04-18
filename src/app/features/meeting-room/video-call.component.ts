@@ -10,6 +10,8 @@ import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { AiPanelComponent } from './components/ai-panel/ai-panel.component';
 import { WhiteboardComponent } from './components/whiteboard/whiteboard.component';
 import { HostToolsPanelComponent } from './components/host-tools-panel/host-tools-panel.component';
+import { RaisedHandsPanelComponent } from './components/raised-hands-panel/raised-hands-panel.component';
+import { KnockNotificationsComponent } from './components/knock-notifications/knock-notifications.component';
 
 /** A single floating reaction particle on screen */
 interface FloatingReaction {
@@ -33,6 +35,8 @@ interface FloatingReaction {
     AiPanelComponent,
     WhiteboardComponent,
     HostToolsPanelComponent,
+    RaisedHandsPanelComponent,
+    KnockNotificationsComponent,
   ],
   templateUrl: './video-call.component.html',
   styleUrls: ['./video-call.component.scss']

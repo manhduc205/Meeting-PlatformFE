@@ -128,6 +128,28 @@ const REACTIONS = ['👍', '👏', '😂', '❤️', '🎉', '🤔', '👋'];
           <span class="ctrl-label">Participants</span>
         </button>
 
+        <!-- Waiting Room (Host only) -->
+        <button
+          *ngIf="ms.isHost()"
+          class="ctrl-btn"
+          [class.active]="ms.sidebarTab() === 'waiting'"
+          [class.waiting-alert]="ms.waitingParticipants().length > 0"
+          (click)="ms.toggleSidebar('waiting')"
+          title="Phòng chờ"
+          id="waiting-room-btn"
+        >
+          <span class="ctrl-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12,6 12,12 16,14"/>
+            </svg>
+            <span class="ctrl-badge ctrl-badge--amber" *ngIf="ms.waitingParticipants().length > 0">
+              {{ ms.waitingParticipants().length > 9 ? '9+' : ms.waitingParticipants().length }}
+            </span>
+          </span>
+          <span class="ctrl-label">Phòng chờ</span>
+        </button>
+
         <!-- Chat -->
         <button
           class="ctrl-btn"
@@ -166,7 +188,10 @@ const REACTIONS = ['👍', '👏', '😂', '❤️', '🎉', '🤔', '👋'];
         <button
           class="ctrl-btn"
           [class.active]="ms.isHandRaised()"
+          [class.hand-raised]="ms.isHandRaised()"
           (click)="ms.toggleHand()"
+          [title]="ms.isHandRaised() ? 'Lower Hand' : 'Raise Hand'"
+          id="raise-hand-btn"
         >
           <span class="ctrl-icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -175,8 +200,36 @@ const REACTIONS = ['👍', '👏', '😂', '❤️', '🎉', '🤔', '👋'];
               <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/>
               <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
             </svg>
+            <!-- Badge showing how many others have raised hand -->
+            <span class="ctrl-badge ctrl-badge--amber" *ngIf="ms.raisedHandCount() > 0 && !ms.isHandRaised()">
+              {{ ms.raisedHandCount() > 9 ? '9+' : ms.raisedHandCount() }}
+            </span>
           </span>
           <span class="ctrl-label">{{ ms.isHandRaised() ? 'Lower Hand' : 'Raise Hand' }}</span>
+        </button>
+
+        <!-- Raised Hands Panel Toggle (Host: see who raised hands) -->
+        <button
+          *ngIf="ms.isHost() && ms.raisedHandCount() > 0"
+          class="ctrl-btn ctrl-btn--hands-alert"
+          [class.active]="ms.showRaisedHands()"
+          (click)="ms.toggleRaisedHands()"
+          title="View raised hands"
+          id="raised-hands-panel-btn"
+        >
+          <span class="ctrl-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+              <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
+              <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
+              <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/>
+              <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+            </svg>
+            <span class="ctrl-badge ctrl-badge--amber">
+              {{ ms.raisedHandCount() > 9 ? '9+' : ms.raisedHandCount() }}
+            </span>
+          </span>
+          <span class="ctrl-label">Hands ({{ ms.raisedHandCount() }})</span>
         </button>
 
         <!-- Whiteboard -->

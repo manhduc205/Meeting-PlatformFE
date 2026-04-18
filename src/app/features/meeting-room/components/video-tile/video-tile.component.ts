@@ -41,15 +41,17 @@ import { Participant } from '../../models/meeting.model';
       <div
         *ngIf="!participant.isCameraOn || !participant.stream"
         class="tile-avatar-bg"
-        [style.background-color]="participant.avatarColor + '22'"
       >
         <div
           class="tile-avatar"
-          [style.background-color]="participant.avatarColor"
+          [style.background-image]="participant.avatarUrl ? 'url(' + participant.avatarUrl + ')' : ''"
+          [style.background-color]="participant.avatarUrl ? 'transparent' : participant.avatarColor"
         >
-          {{ participant.initials }}
+          <!-- Chỉ hiển thị initials nếu không có ảnh -->
+          <ng-container *ngIf="!participant.avatarUrl">
+            {{ participant.initials }}
+          </ng-container>
         </div>
-        <span class="tile-avatar-name">{{ participant.name }}</span>
       </div>
 
       <!-- Speaking ring -->

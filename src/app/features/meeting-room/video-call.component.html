@@ -65,6 +65,9 @@
           {{ ms.toastMessage()?.text }}
         </div>
 
+        <!-- ===== HOST KNOCK NOTIFICATIONS (Waiting Room Toasts) ===== -->
+        <app-knock-notifications *ngIf="ms.isHost()"></app-knock-notifications>
+
         <!-- Video grid — uses allParticipants (local + remote) -->
         <div class="vc-grid-wrapper">
           <app-video-grid
@@ -73,8 +76,8 @@
           ></app-video-grid>
         </div>
 
-        <!-- Whiteboard -->
-        <app-whiteboard *ngIf="ms.showWhiteboard()"></app-whiteboard>
+        <!-- Whiteboard — use [hidden] NOT *ngIf so the canvas content is preserved when toggled off -->
+        <app-whiteboard [hidden]="!ms.showWhiteboard()"></app-whiteboard>
 
         <!-- Control bar -->
         <app-control-bar></app-control-bar>
@@ -85,6 +88,12 @@
           [participants]="ms.allParticipants()"
           (closePanel)="ms.showHostTools.set(false)"
         ></app-host-tools-panel>
+
+        <!-- Raised Hands Panel — visible to host when raisedHandCount > 0 -->
+        <app-raised-hands-panel
+          *ngIf="ms.showRaisedHands()"
+          (closePanel)="ms.showRaisedHands.set(false)"
+        ></app-raised-hands-panel>
 
         <!-- AI Panel (floating over video) -->
         <app-ai-panel *ngIf="ms.showAIPanel()" class="ai-panel-float"></app-ai-panel>

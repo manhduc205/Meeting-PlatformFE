@@ -5,14 +5,12 @@ import { environment } from '../../../environments/environment';
 
 export interface ParticipantDto {
   id: string;
+  email: string;
   firstName: string;
-  avatarUrl: string;
-}
-
-export interface ActiveParticipantsResponse {
-  totalCount: number;
-  participants: ParticipantDto[];
-  displayText: string;
+  lastName: string;
+  fullName: string;
+  avatarUrl: string | null;
+  status: 'HOST' | 'RAISING_HAND' | 'ACTIVE' | string;
 }
 
 export interface JoinMeetingRequest {
@@ -21,6 +19,8 @@ export interface JoinMeetingRequest {
 }
 
 export interface JoinMeetingResponse {
+  meetingCode?: string;
+  userId?: string;
   status: 'APPROVED' | 'WAITING' | 'REJECTED';
   message?: string;
 }
@@ -53,6 +53,21 @@ export interface MeetingInfo {
   isWaitingRoomEnabled?: boolean;
 }
 
+// ── Waiting Room ──────────────────────────────────────────────────────────────
+
+export interface WaitingParticipantDto {
+  id: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+  status: 'WAITING';
+}
+
+export interface WaitingRoomActionRequest {
+  action: 'APPROVE' | 'REJECT';
+  userIds: string[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -64,8 +79,13 @@ export class MeetingService {
     return this.http.get<MeetingInfo>(`${this.apiUrl}/${meetingCode}`);
   }
 
-  getActiveParticipants(meetingCode: string): Observable<ActiveParticipantsResponse> {
-    return this.http.get<ActiveParticipantsResponse>(`${this.apiUrl}/${meetingCode}/participants/active`);
+  getAllParticipants(meetingCode: string): Observable<ParticipantDto[]> {
+    return this.http.get<ParticipantDto[]>(`${this.apiUrl}/${meetingCode}/participants`);
+  }
+
+  /** GET /api/v1/meetings/{meetingCode}/participants/sidebar — active participants only */
+  getSidebarParticipants(meetingCode: string): Observable<ParticipantDto[]> {
+    return this.http.get<ParticipantDto[]>(`${this.apiUrl}/${meetingCode}/participants/sidebar`);
   }
 
   joinMeeting(request: JoinMeetingRequest): Observable<JoinMeetingResponse> {
@@ -74,5 +94,17 @@ export class MeetingService {
 
   createMeeting(request: MeetingCreateRequest): Observable<MeetingCreateResponse> {
     return this.http.post<MeetingCreateResponse>(`${this.apiUrl}/create`, request);
+  }
+
+  // ── Waiting Room (Host only) ───────────────────────────────────────────────
+
+  /** GET /api/v1/meetings/{meetingCode}/host/waiting-room */
+  getWaitingRoom(meetingCode: string): Observable<WaitingParticipantDto[]> {
+    return this.http.get<WaitingParticipantDto[]>(`${this.apiUrl}/${meetingCode}/host/waiting-room`);
+  }
+
+  /** POST /api/v1/meetings/{meetingCode}/host/waiting-room/action */
+  processWaitingRoom(meetingCode: string, request: WaitingRoomActionRequest): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${meetingCode}/host/waiting-room/action`, request);
   }
 }

@@ -1,0 +1,579 @@
+@use 'sass:color';
+
+// ── Design tokens ─────────────────────────────────────────────────────────────
+$surface: #1a1f2e;
+$surface-2: #222838;
+$surface-3: #2a3040;
+$border: rgba(255, 255, 255, 0.08);
+$border-hover: rgba(255, 255, 255, 0.15);
+$text-primary: #f0f4ff;
+$text-secondary: #8892aa;
+$text-muted: #5c6680;
+$accent: #6c63ff;
+$accent-hover: #7c73ff;
+$accent-glow: rgba(108, 99, 255, 0.35);
+$green: #10b981;
+$green-dim: rgba(16, 185, 129, 0.15);
+$red: #ef4444;
+$amber: #f59e0b;
+$amber-dim: rgba(245, 158, 11, 0.15);
+$radius: 10px;
+$radius-sm: 6px;
+$radius-lg: 14px;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ROOT
+// ══════════════════════════════════════════════════════════════════════════════
+.poll-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: $surface;
+  overflow: hidden;
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+.poll-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid $border;
+  flex-shrink: 0;
+  background: $surface-2;
+}
+
+.poll-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: $text-primary;
+  font-weight: 600;
+  font-size: 14px;
+
+  svg { color: $accent; }
+}
+
+.poll-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: $accent;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+}
+
+.create-poll-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: $accent;
+  background: rgba($accent, 0.12);
+  border: 1px solid rgba($accent, 0.3);
+  border-radius: $radius-sm;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba($accent, 0.2);
+    border-color: rgba($accent, 0.5);
+  }
+
+  &.active {
+    color: $red;
+    background: rgba($red, 0.12);
+    border-color: rgba($red, 0.3);
+  }
+}
+
+// ── Create Poll Form ──────────────────────────────────────────────────────────
+.create-form-wrapper {
+  flex-shrink: 0;
+  overflow-y: auto;
+  max-height: 60%;
+  border-bottom: 1px solid $border;
+  animation: slideDown 0.25s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.create-form {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.form-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: $text-secondary;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.form-textarea {
+  width: 100%;
+  background: $surface-3;
+  border: 1px solid $border;
+  border-radius: $radius-sm;
+  color: $text-primary;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 10px 12px;
+  resize: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+
+  &::placeholder { color: $text-muted; }
+  &:focus {
+    outline: none;
+    border-color: rgba($accent, 0.5);
+    box-shadow: 0 0 0 3px rgba($accent, 0.1);
+  }
+}
+
+.char-count {
+  position: absolute;
+  bottom: 6px;
+  right: 8px;
+  font-size: 10px;
+  color: $text-muted;
+  pointer-events: none;
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.option-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.option-bullet {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba($accent, 0.15);
+  color: $accent;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.option-input {
+  flex: 1;
+  background: $surface-3;
+  border: 1px solid $border;
+  border-radius: $radius-sm;
+  color: $text-primary;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 8px 10px;
+  transition: border-color 0.2s;
+
+  &::placeholder { color: $text-muted; }
+  &:focus {
+    outline: none;
+    border-color: rgba($accent, 0.5);
+  }
+}
+
+.remove-option-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba($red, 0.1);
+  color: $red;
+  border: 1px solid rgba($red, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+
+  &:hover { background: rgba($red, 0.2); }
+}
+
+.add-option-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: $text-secondary;
+  background: transparent;
+  border: 1px dashed $border;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  transition: all 0.2s;
+  align-self: flex-start;
+
+  &:hover {
+    color: $accent;
+    border-color: rgba($accent, 0.4);
+    background: rgba($accent, 0.05);
+  }
+}
+
+.form-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: $surface-3;
+  border: 1px solid $border;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  flex-shrink: 0;
+
+  &.on {
+    background: $accent;
+    border-color: $accent;
+    box-shadow: 0 0 10px $accent-glow;
+  }
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: $text-secondary;
+  transition: transform 0.25s ease, background 0.25s;
+
+  .on & {
+    transform: translateX(16px);
+    background: #fff;
+  }
+}
+
+.launch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, $accent, #a855f7);
+  border: none;
+  border-radius: $radius;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(108, 99, 255, 0.3);
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(108, 99, 255, 0.45);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+// ── Polls List ────────────────────────────────────────────────────────────────
+.polls-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: $surface-3; border-radius: 2px; }
+}
+
+// ── Empty State ───────────────────────────────────────────────────────────────
+.polls-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 16px;
+  text-align: center;
+  color: $text-muted;
+}
+
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: $surface-2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  color: $text-muted;
+}
+
+.empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text-secondary;
+  margin: 0;
+}
+
+.empty-sub {
+  font-size: 12px;
+  color: $text-muted;
+  margin: 0;
+}
+
+// ── Poll Card ─────────────────────────────────────────────────────────────────
+.poll-card {
+  background: $surface-2;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  overflow: hidden;
+  transition: border-color 0.2s;
+  animation: fadeInUp 0.3s ease;
+
+  &.closed {
+    opacity: 0.85;
+    border-color: rgba(255,255,255,0.05);
+  }
+
+  &:hover:not(.closed) { border-color: $border-hover; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+// ── Status Bar ────────────────────────────────────────────────────────────────
+.poll-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  border-bottom: 1px solid $border;
+
+  &.open {
+    background: $green-dim;
+    color: $green;
+    .status-dot { background: $green; }
+  }
+
+  &.closed {
+    background: rgba(255,255,255,0.03);
+    color: $text-muted;
+    .status-dot { background: $text-muted; }
+  }
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  .open & { animation: pulse 1.5s infinite; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.multi-badge {
+  margin-left: auto;
+  background: rgba($amber, 0.15);
+  color: $amber;
+  padding: 1px 6px;
+  border-radius: 20px;
+  font-size: 10px;
+}
+
+.close-poll-btn {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: $red;
+  background: rgba($red, 0.12);
+  border: 1px solid rgba($red, 0.25);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover { background: rgba($red, 0.22); }
+}
+
+// ── Poll question ─────────────────────────────────────────────────────────────
+.poll-question {
+  font-size: 13px;
+  font-weight: 600;
+  color: $text-primary;
+  padding: 12px 12px 10px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+// ── Options ───────────────────────────────────────────────────────────────────
+.poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px;
+}
+
+.poll-option-btn {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: $radius-sm;
+  border: 1px solid $border;
+  background: $surface-3;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+
+  &:hover:not(:disabled):not(.has-voted):not(.closed) {
+    border-color: rgba($accent, 0.45);
+    background: rgba($accent, 0.08);
+  }
+
+  &.voted {
+    border-color: rgba($accent, 0.6);
+    background: rgba($accent, 0.1);
+  }
+
+  &:disabled { cursor: default; }
+}
+
+// Animated fill bar
+.vote-bar {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba($accent, 0.2), rgba($accent, 0.06));
+  border-radius: $radius-sm;
+  transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+  pointer-events: none;
+}
+
+.voted .vote-bar {
+  background: linear-gradient(90deg, rgba($accent, 0.35), rgba($accent, 0.1));
+}
+
+.option-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+}
+
+.option-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: $accent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.option-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid $border-hover;
+  flex-shrink: 0;
+}
+
+.opt-text {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: $text-primary;
+  text-align: left;
+}
+
+.opt-pct {
+  font-size: 11px;
+  font-weight: 700;
+  color: $text-secondary;
+  white-space: nowrap;
+}
+
+.opt-count {
+  font-weight: 400;
+  color: $text-muted;
+  font-size: 10px;
+}
+
+// ── Footer ────────────────────────────────────────────────────────────────────
+.poll-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 12px;
+  margin-top: 6px;
+}
+
+.total-votes {
+  font-size: 11px;
+  color: $text-muted;
+}
+
+.voted-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: $green;
+
+  svg { color: $green; }
+}

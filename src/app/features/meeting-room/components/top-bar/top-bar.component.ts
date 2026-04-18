@@ -73,14 +73,44 @@ import { MeetingStateService } from '../../services/meeting-state.service';
 
       <!-- Right: view toggle + user -->
       <div class="tb-right">
-        <button class="tb-icon-btn" title="Grid view">
-          <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
-            <rect x="1" y="1" width="6" height="6" rx="1"/>
-            <rect x="9" y="1" width="6" height="6" rx="1"/>
-            <rect x="1" y="9" width="6" height="6" rx="1"/>
-            <rect x="9" y="9" width="6" height="6" rx="1"/>
-          </svg>
-        </button>
+        <div class="layout-menu-container">
+          <button class="tb-icon-btn" (click)="toggleLayoutMenu()" title="View options">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+              <rect x="1" y="1" width="6" height="6" rx="1"/>
+              <rect x="9" y="1" width="6" height="6" rx="1"/>
+              <rect x="1" y="9" width="6" height="6" rx="1"/>
+              <rect x="9" y="9" width="6" height="6" rx="1"/>
+            </svg>
+            <span class="chevron" [class.open]="showLayoutMenu">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6,9 12,15 18,9"/>
+              </svg>
+            </span>
+          </button>
+          
+          <div class="layout-dropdown" *ngIf="showLayoutMenu">
+            <button class="layout-item" (click)="setLayout('speaker')">
+              <span class="check" [class.active]="ms.layoutMode() === 'speaker'">✓</span>
+              <span>Speaker</span>
+              <span class="icon">▀</span>
+            </button>
+            <button class="layout-item" (click)="setLayout('gallery')">
+              <span class="check" [class.active]="ms.layoutMode() === 'gallery'">✓</span>
+              <span>Gallery</span>
+              <span class="icon">⸬</span>
+            </button>
+            <button class="layout-item" (click)="setLayout('dynamic')">
+              <span class="check" [class.active]="ms.layoutMode() === 'dynamic'">✓</span>
+              <span>Dynamic gallery</span>
+              <span class="icon">◫</span>
+            </button>
+            <button class="layout-item" (click)="setLayout('multi')">
+              <span class="check" [class.active]="ms.layoutMode() === 'multi'">✓</span>
+              <span>Multi-speaker</span>
+              <span class="icon">⊞</span>
+            </button>
+          </div>
+        </div>
 
         <div class="tb-divider"></div>
 
@@ -106,7 +136,17 @@ export class TopBarComponent {
   @Input() localUserInitials = 'AM';
 
   elapsed = '00:42:17';
-  private ms = inject(MeetingStateService);
+  ms = inject(MeetingStateService);
+  showLayoutMenu = false;
+
+  toggleLayoutMenu() {
+    this.showLayoutMenu = !this.showLayoutMenu;
+  }
+
+  setLayout(mode: 'speaker' | 'gallery' | 'dynamic' | 'multi') {
+    this.ms.layoutMode.set(mode);
+    this.showLayoutMenu = false;
+  }
 
   copyCode() {
     navigator.clipboard.writeText(this.meetingCode).catch(() => {});

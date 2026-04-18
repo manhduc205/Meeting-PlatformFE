@@ -2,6 +2,7 @@ export interface Participant {
   id: string;
   name: string;
   initials: string;
+  avatarUrl?: string;
   avatarColor: string;
   isMuted: boolean;
   isCameraOn: boolean;
@@ -31,15 +32,19 @@ export interface ChatMessage {
 export interface PollOption {
   id: string;
   text: string;
-  votes: number;
+  voteCount: number;
+  /** Backend đánh dấu chính xác user này đã chọn option này chưa */
+  votedByMe: boolean;
 }
 
 export interface Poll {
   id: string;
   question: string;
+  isMultipleChoice: boolean;
+  status: 'OPEN' | 'CLOSED';
   options: PollOption[];
+  hasVoted: boolean;
   totalVotes: number;
-  votedOption?: string;
 }
 
 export interface ActionItem {
@@ -56,7 +61,7 @@ export interface TranscriptEntry {
   text: string;
 }
 
-export type SidebarTab = 'participants' | 'chat' | 'polls' | 'qa';
+export type SidebarTab = 'participants' | 'chat' | 'polls' | 'qa' | 'waiting';
 export type AITab = 'summary' | 'actions' | 'transcript' | 'ask';
 
 export interface AskMessage {

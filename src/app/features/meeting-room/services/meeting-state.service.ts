@@ -1,11 +1,18 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { Subject, Subscription } from 'rxjs';
+import { Subject, Subscription, Observable } from 'rxjs';
 import { Participant, ChatMessage, Poll, SidebarTab } from '../models/meeting.model';
+import { RaisedHandParticipant } from '../models/meeting.types';
 import { SignalingService } from './signaling.service';
 import { MediaStreamService, ReactionPayload, WhiteboardPayload, WhiteboardClearPayload } from './media-stream.service';
 import { AuthService } from '../../auth/auth.service';
+import { HostControlService } from './host-control.service';
+import { MeetingActionService } from './meeting-action.service';
+import { PollService } from './poll.service';
+import { PollCreateRequest } from '../models/meeting.types';
+import { firstValueFrom } from 'rxjs';
 
+import { MeetingService, ParticipantDto, WaitingParticipantDto } from '../../../core/services/meeting.service';
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'error';
 
 export interface ReactionEvent {
@@ -21,6 +28,10 @@ export class MeetingStateService {
   private media = inject(MediaStreamService);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private hostControl = inject(HostControlService);
+  private meetingAction = inject(MeetingActionService);
+  private pollService = inject(PollService);
+  private meetingService = inject(MeetingService);
 
   // ── Core meeting info ────────────────────────────────────────────────────
   meetingCode = signal('');
@@ -39,7 +50,10 @@ export class MeetingStateService {
 
   // ── Other UI signals ─────────────────────────────────────────────────────
   participants = signal<Participant[]>([]);
-  isHandRaised = signal(false);
+  backendParticipants = signal<ParticipantDto[]>([]);
+  layoutMode = signal<'speaker' | 'gallery' | 'dynamic' | 'multi'>('dynamic');
+  isHandRaised = signal(false);         // true = local user has hand up
+  isHost = signal(false);               // true = local user is the meeting host
   sidebarTab = signal<SidebarTab | null>(null);
   messages = signal<ChatMessage[]>([]);
   unreadMessages = signal(0);
@@ -48,9 +62,28 @@ export class MeetingStateService {
   showAIPanel = signal(false);
   showHostTools = signal(false);
   showReactions = signal(false);
+  showRaisedHands = signal(false);      // Raised Hands panel visibility
   hasLeft = signal(false);
   toastMessage = signal<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
   localStream = signal<MediaStream | null>(null);
+
+  // ── Waiting Room state (Host) ───────────────────────────────────────────────
+  waitingParticipants = signal<WaitingParticipantDto[]>([]);
+  /** Each knock notification pushed to host via WebSocket */
+  hostKnockNotifications = signal<Array<{ id: string; firstName: string; lastName: string; userId: string; timestamp: number }>>([]);
+
+  /**
+   * Canonical list of participants who have raised their hand.
+   * ─────────────────────────────────────────────────────────────────────────
+   * Populated ONCE via GET on join. Delta-updated by WebSocket events:
+   *   RAISE → push only (no re-fetch)
+   *   LOWER → filter only (no re-fetch)
+   * Angular tracks items by id via trackBy in *ngFor — zero DOM re-render on push.
+   */
+  raisedHandList = signal<RaisedHandParticipant[]>([]);
+
+  /** Derived count for badge display on control bar button */
+  readonly raisedHandCount = computed(() => this.raisedHandList().length);
 
   // ── DataChannel event streams ────────────────────────────────────────────
   readonly reaction$ = new Subject<ReactionEvent>();
@@ -60,14 +93,20 @@ export class MeetingStateService {
   readonly localParticipant = computed<Participant | null>(() => {
     const user = this.auth.getCurrentUser();
     if (!user) return null;
+
+    // Look up avatar + full name from backend participant list for the local user
+    const beInfo = this.backendParticipants().find(p => p.id === user.id);
+
     return {
       id: 'local',
-      name: user.name,
-      initials: user.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
+      name: beInfo?.fullName || user.name,
+      initials: (beInfo?.fullName || user.name).split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
       avatarColor: '#4f46e5',
+      // Use backend avatarUrl if available, otherwise undefined (shows initials)
+      avatarUrl: beInfo?.avatarUrl ?? undefined,
       isMuted: this.isMuted(),
       isCameraOn: this.isCameraOn(),
-      isHost: true,
+      isHost: this.isHost(),
       isSpeaking: false,
       isHandRaised: this.isHandRaised(),
       isLocal: true,
@@ -78,13 +117,36 @@ export class MeetingStateService {
   });
 
   readonly allParticipants = computed<Participant[]>(() => {
+    const backendData = this.backendParticipants();
     const local = this.localParticipant();
-    const remotes = this.participants();
+    
+    // Ghi đè Name và cờ isHost từ dữ liệu chuẩn server
+    const remotes = this.participants().map(rp => {
+      const beInfo = backendData.find(b => b.id === rp.id);
+      if (beInfo) {
+        return {
+          ...rp,
+          name: beInfo.fullName || rp.name,
+          avatarUrl: beInfo.avatarUrl || undefined,
+          initials: beInfo.fullName ? beInfo.fullName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) : rp.initials,
+          isHost: beInfo.status === 'HOST'
+        };
+      }
+      return rp;
+    });
+
     return local ? [local, ...remotes] : remotes;
   });
 
   private subs = new Subscription();
   private _reactionCounter = 0;
+  /**
+   * When REST createPoll fails, we suppress the next incoming STOMP POLL_CREATED
+   * event for a short window (5s). This prevents a ghost poll from appearing on
+   * the UI if the backend broadcasts STOMP before returning the HTTP error.
+   */
+  private _suppressNextPollCreated = false;
+  private _suppressTimer: ReturnType<typeof setTimeout> | null = null;
 
   // ── Join / Leave ─────────────────────────────────────────────────────────
 
@@ -110,6 +172,23 @@ export class MeetingStateService {
       this.signaling.connect(code, user.id);
       await this.media.connect(code);
       this.connectionState.set('connected');
+
+      // Fetch chuẩn host và thông tin UUID->Name từ REST API
+      this.meetingService.getAllParticipants(code).subscribe({
+        next: (res) => {
+          this.backendParticipants.set(res);
+          const hostPart = res.find(p => p.status === 'HOST');
+          if (hostPart && hostPart.id === user.id) {
+            this.isHost.set(true);
+            // Immediately load waiting room for host
+            this.loadWaitingRoom();
+          } else {
+            this.isHost.set(false);
+          }
+        },
+        error: (err: any) => console.error('Failed to load active participants on join', err)
+      });
+
     } catch (e) {
       console.error('[Meeting] Join failed', e);
       this.connectionState.set('error');
@@ -183,6 +262,132 @@ export class MeetingStateService {
         }
       })
     );
+
+    // ── STOMP: Presence (Để cập nhật Tên + Host khi có người vào/ra) ────────
+    this.subs.add(
+      this.signaling.presence$.subscribe(msg => {
+        if (msg.type === 'JOIN' || msg.type === 'USER_LIST_SYNC' || msg.type === 'LEAVE') {
+          this.meetingService.getAllParticipants(code).subscribe({
+            next: (res) => this.backendParticipants.set(res),
+            error: (err: any) => console.error('Failed to reload participants', err)
+          });
+        }
+      })
+    );
+
+    // ── STOMP: Host Commands — /topic/meeting.{code}.commands ──────────────
+    this.subs.add(
+      this.hostControl.commands$.subscribe(cmd => {
+        this._handleHostCommand(cmd);
+      })
+    );
+
+    // ── STOMP: Raised Hands delta — /topic/meeting.{code}.raised-hands ─────
+    // Performance: push/filter ONLY. NEVER re-fetch API on delta update.
+    this.subs.add(
+      this.meetingAction.raisedHands$.subscribe(event => {
+        if (event.action === 'RAISE') {
+          // Deduplication guard: only add if not already in list
+          this.raisedHandList.update(list => {
+            const exists = list.some(p => p.id === event.data.id);
+            return exists ? list : [...list, event.data];
+          });
+          this.showToast(`✋ ${event.data.fullName} raised their hand`, 'info');
+        } else if (event.action === 'LOWER') {
+          // O(n) filter — remove the participant who lowered their hand
+          this.raisedHandList.update(list =>
+            list.filter(p => p.id !== event.userId)
+          );
+        }
+      })
+    );
+
+    // ── Initial raised hands list (called ONCE on join) ────────────────────
+    this._fetchInitialRaisedHands(code);
+
+    // ── STOMP: Poll events — /topic/meeting.{code}.polls ──────────────────
+    this.subs.add(
+      this.pollService.polls$.subscribe(event => {
+        if (event.action === 'POLL_CREATED') {
+          // Guard: if the REST call for THIS session failed, swallow the stale STOMP event
+          if (this._suppressNextPollCreated) {
+            this._suppressNextPollCreated = false;
+            if (this._suppressTimer) { clearTimeout(this._suppressTimer); this._suppressTimer = null; }
+            return; // ← poll sẽ KHÔNG xuất hiện trên giao diện
+          }
+          const p = event.data;
+          const newPoll: Poll = {
+            id: p.id,
+            question: p.question,
+            isMultipleChoice: p.isMultipleChoice,
+            status: p.status,
+            options: p.options.map((o: any) => ({
+              id: o.id,
+              text: o.text,
+              voteCount: o.voteCount || 0,
+              votedByMe: o.votedByMe || false,
+            })),
+            hasVoted: p.hasVoted || false,
+            totalVotes: (p as any).totalVotes || 0,
+          };
+          this.polls.update(list => [...list, newPoll]);
+          if (this.sidebarTab() !== 'polls') {
+            this.showToast('📊 A new poll has started!', 'info');
+          }
+        } else if (event.action === 'VOTE_UPDATED') {
+          // Đã fix: Lấy cục newCounts từ Backend gửi về để đồng bộ chính xác tuyệt đối
+          this.polls.update(list =>
+            list.map(p => {
+              if (p.id !== event.pollId) return p;
+
+              let newTotal = 0;
+              const updatedOptions = p.options.map(o => {
+                // Parse số đếm chuẩn từ Backend (Map mới nhất), k có thì mặc định 0
+                const count = parseInt((event as any).newCounts[o.id]) || 0;
+                newTotal += count;
+                return { ...o, voteCount: count };
+              });
+
+              return {
+                ...p,
+                options: updatedOptions,
+                totalVotes: newTotal
+              };
+            })
+          );
+        } else if (event.action === 'POLL_CLOSED') {
+          this.polls.update(list =>
+            list.map(p => p.id === event.pollId ? { ...p, status: 'CLOSED' as const } : p)
+          );
+          this.showToast('📊 Poll has been closed', 'info');
+        }
+      })
+    );
+
+    // ── STOMP: Host Notifications — /topic/meeting.{code}.host-notifications ──
+    // Host receives knock notifications when a user joins the waiting room
+    this.subs.add(
+      this.signaling.hostKnock$.subscribe(knock => {
+        if (knock.type === 'NEW_KNOCK') {
+          // Show persistent toast for the host with action buttons
+          const notif = {
+            id: `knock-${Date.now()}-${Math.random()}`,
+            firstName: knock.firstName,
+            lastName: knock.lastName,
+            userId: knock.userId,
+            timestamp: Date.now()
+          };
+          this.hostKnockNotifications.update(list => [...list, notif]);
+          // Also refresh the waiting room list
+          this.loadWaitingRoom();
+        }
+      })
+    );
+
+    // ── Load initial waiting room list for host ───────────────────────────────
+    if (this.isHost()) {
+      this.loadWaitingRoom();
+    }
   }
 
   private _handleDataMessage(payload: any, participantIdentity: string): void {
@@ -209,7 +414,124 @@ export class MeetingStateService {
     await this.media.disconnect();
     this.localStream.set(null);
     this.participants.set([]);
+    this.raisedHandList.set([]);
+    this.polls.set([]);
+    this.waitingParticipants.set([]);
+    this.hostKnockNotifications.set([]);
+    this.isHandRaised.set(false);
     this.connectionState.set('idle');
+  }
+
+  // ── Waiting Room Actions (Host) ─────────────────────────────────────────────
+
+  loadWaitingRoom(): void {
+    const code = this.meetingCode();
+    if (!code || !this.isHost()) return;
+    this.meetingService.getWaitingRoom(code).subscribe({
+      next: (list) => this.waitingParticipants.set(list),
+      error: (err) => console.warn('[WaitingRoom] Failed to load waiting room', err)
+    });
+  }
+
+  approveWaitingUser(userId: string): void {
+    const code = this.meetingCode();
+    // Optimistic
+    this.waitingParticipants.update(list => list.filter(p => p.id !== userId));
+    this.dismissKnockNotification(userId);
+    this.meetingService.processWaitingRoom(code, { action: 'APPROVE', userIds: [userId] }).subscribe({
+      error: () => {
+        this.loadWaitingRoom();
+        this.showToast('Lỗi khi duyệt người dùng', 'error');
+      }
+    });
+  }
+
+  rejectWaitingUser(userId: string): void {
+    const code = this.meetingCode();
+    // Optimistic
+    this.waitingParticipants.update(list => list.filter(p => p.id !== userId));
+    this.dismissKnockNotification(userId);
+    this.meetingService.processWaitingRoom(code, { action: 'REJECT', userIds: [userId] }).subscribe({
+      error: () => {
+        this.loadWaitingRoom();
+        this.showToast('Lỗi khi từ chối người dùng', 'error');
+      }
+    });
+  }
+
+  admitAllWaiting(): void {
+    const code = this.meetingCode();
+    const userIds = this.waitingParticipants().map(p => p.id);
+    if (userIds.length === 0) return;
+    this.waitingParticipants.set([]);
+    this.hostKnockNotifications.set([]);
+    this.meetingService.processWaitingRoom(code, { action: 'APPROVE', userIds }).subscribe({
+      next: () => this.showToast(`✅ Đã duyệt tất cả ${userIds.length} người`, 'success'),
+      error: () => {
+        this.loadWaitingRoom();
+        this.showToast('Lỗi khi duyệt tất cả', 'error');
+      }
+    });
+  }
+
+  dismissKnockNotification(userId: string): void {
+    this.hostKnockNotifications.update(list => list.filter(n => n.userId !== userId));
+  }
+
+  // ── Private helpers ─────────────────────────────────────────────────────────────
+
+  /**
+   * Fetch initial raised hands ONCE on join.
+   * Populates raisedHandList. Never called again — deltas come via WebSocket.
+   */
+  private async _fetchInitialRaisedHands(meetingCode: string): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.meetingAction.getRaisedHands(meetingCode)
+      );
+      this.raisedHandList.set(res.participants);
+    } catch (e) {
+      console.warn('[MeetingState] Could not fetch initial raised hands', e);
+    }
+  }
+
+  /**
+   * Handle commands received from /topic/meeting.{code}.commands
+   * ───────────────────────────────────────────────────────────────
+   * Only non-host participants need to react to MUTE_ALL and KICK.
+   */
+  private _handleHostCommand(cmd: import('../models/meeting.types').HostCommandPayload): void {
+    const myUserId = this.auth.getCurrentUser()?.id;
+
+    switch (cmd.action) {
+      case 'MUTE_ALL': {
+        // If I am NOT the host, mute my mic via LiveKit
+        if (!this.isHost()) {
+          this.isMuted.set(true);
+          this.media.setMicEnabled(false);
+          this.showToast('🔇 The host has muted everyone', 'info');
+        }
+        break;
+      }
+
+      case 'KICK': {
+        // If targetId matches my userId, disconnect and redirect
+        if (cmd.targetId && cmd.targetId === myUserId) {
+          this.showToast('⚠️ You have been removed from the meeting', 'error');
+          this.cleanupMedia().then(() => {
+            this.hasLeft.set(true);
+            this.router.navigate(['/']);
+          });
+        }
+        break;
+      }
+
+      case 'SETTING_CHANGED': {
+        // For info only — host panel already updated optimistically
+        console.log('[HostCmd] Setting changed:', cmd.type, cmd.enabled);
+        break;
+      }
+    }
   }
 
   // ── Controls — Optimistic update + SDK call + rollback on error ───────────
@@ -275,9 +597,29 @@ export class MeetingStateService {
     }
   }
 
+  /**
+   * Raise/Lower Hand:
+   * 1. Optimistic toggle of isHandRaised signal for instant UI
+   * 2. Call REST API POST raise-hand
+   * 3. Rollback on error
+   */
   toggleHand(): void {
-    this.isHandRaised.update(v => !v);
-    this.showToast(this.isHandRaised() ? '✋ Hand raised' : 'Hand lowered', 'info');
+    const wasRaised = this.isHandRaised();
+    const nextRaising = !wasRaised;
+    this.isHandRaised.set(nextRaising); // optimistic
+
+    this.meetingAction.toggleRaiseHand(this.meetingCode(), nextRaising).subscribe({
+      next: () => {
+        this.showToast(
+          nextRaising ? '✋ Hand raised' : 'Hand lowered',
+          'info'
+        );
+      },
+      error: () => {
+        this.isHandRaised.set(wasRaised); // rollback
+        this.showToast('Could not toggle hand raise', 'error');
+      },
+    });
   }
 
   // ── Reactions ─────────────────────────────────────────────────────────────
@@ -334,6 +676,14 @@ export class MeetingStateService {
     this.showHostTools.update(v => !v);
     this.showAIPanel.set(false);
     this.showReactions.set(false);
+    this.showRaisedHands.set(false);
+  }
+
+  toggleRaisedHands(): void {
+    this.showRaisedHands.update(v => !v);
+    this.showHostTools.set(false);
+    this.showAIPanel.set(false);
+    this.showReactions.set(false);
   }
 
   toggleReactions(): void {
@@ -343,14 +693,75 @@ export class MeetingStateService {
   }
 
   vote(pollId: string, optionId: string): void {
+    const code = this.meetingCode();
+    // Optimistic: cập nhật voteCount và votedByMe ngay lập tức
     this.polls.update(prev =>
-      prev.map(p =>
-        p.id === pollId
-          ? { ...p, votedOption: optionId, totalVotes: p.totalVotes + 1, options: p.options.map(o => o.id === optionId ? { ...o, votes: o.votes + 1 } : o) }
-          : p
-      )
+      prev.map(p => {
+        if (p.id !== pollId) return p;
+        
+        let deltaTotal = 0;
+        const newOptions = p.options.map(o => {
+          let change = 0;
+          if (o.id === optionId && !o.votedByMe) {
+             change = 1; // Chọn option mới
+          } else if (o.id !== optionId && o.votedByMe) {
+             change = -1; // Bỏ chọn option cũ
+          }
+          if (change > 0 && !p.hasVoted) deltaTotal = 1; // Nếu vote lần đầu, tổng tăng 1. Nếu đổi vote, tổng ko đổi.
+          return {
+            ...o,
+            votedByMe: o.id === optionId,
+            voteCount: Math.max(0, (o.voteCount || 0) + change),
+          };
+        });
+
+        return {
+          ...p,
+          hasVoted: true,
+          totalVotes: Math.max(0, (p.totalVotes || 0) + deltaTotal),
+          options: newOptions,
+        };
+      })
     );
-    this.showToast('Your vote has been recorded', 'success');
+    this.pollService.submitVote(code, pollId, optionId).subscribe({
+      next: () => this.showToast('🗳️ Đã ghi nhận phiếu bầu!', 'success'),
+      error: () => {
+        this.showToast('Không thể gửi phiếu bầu', 'error');
+      },
+    });
+  }
+
+  createPoll(request: PollCreateRequest): Observable<void> {
+    const code = this.meetingCode();
+    return new Observable<void>(observer => {
+      this.pollService.createPoll(code, request).subscribe({
+        next: () => {
+          this.showToast('📊 Poll được tạo thành công!', 'success');
+          observer.next();
+          observer.complete();
+        },
+        error: (err: any) => {
+          // ARM suppress flag: nếu backend đã broadcast STOMP trước khi trả HTTP error,
+          // STOMP handler sẽ bỏ qua event đó — poll sẽ không hiển thị trên UI
+          this._suppressNextPollCreated = true;
+          if (this._suppressTimer) clearTimeout(this._suppressTimer);
+          this._suppressTimer = setTimeout(() => {
+            this._suppressNextPollCreated = false;
+            this._suppressTimer = null;
+          }, 5000);
+          this.showToast('Không thể tạo khảo sát', 'error');
+          observer.error(err);
+        },
+      });
+    });
+  }
+
+  closePoll(pollId: string): void {
+    const code = this.meetingCode();
+    this.pollService.closePoll(code, pollId).subscribe({
+      next: () => this.showToast('Poll closed', 'info'),
+      error: () => this.showToast('Failed to close poll', 'error'),
+    });
   }
 
   showToast(text: string, type: 'info' | 'success' | 'error' = 'info'): void {

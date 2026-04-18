@@ -89,31 +89,30 @@
   width: 100%;
   height: 100%;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
   position: absolute;
   inset: 0;
+  // Đổi nền thành màu nền tối trơn không có transparent 22
+  background-color: #151e32;
+  align-items: center;
+  justify-content: center;
 
   .tile-avatar {
-    width: 64px;
-    height: 64px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #fff;
-    font-size: 20px;
-    font-weight: 700;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    font-size: 24px;
+    font-weight: 600;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     flex-shrink: 0;
-  }
-
-  .tile-avatar-name {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.5);
-    font-weight: 400;
+    
+    // Thuộc tính để ảnh hiển thị full mượt
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
   }
 }
 

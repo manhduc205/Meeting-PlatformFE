@@ -1,38 +1,34 @@
-import { Component, inject, signal, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, inject, signal, ViewChild, ElementRef, AfterViewChecked, OnDestroy, effect, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MeetingStateService } from '../../services/meeting-state.service';
 import { SidebarTab, Participant } from '../../models/meeting.model';
+import { MeetingService, ParticipantDto, WaitingParticipantDto } from '../../../../core/services/meeting.service';
+import { HostControlService } from '../../services/host-control.service';
+import { AuthService } from '../../../auth/auth.service';
+import { PollPanelComponent } from '../poll-panel/poll-panel.component';
+import { Subscription } from 'rxjs';
 
-const TABS: { id: SidebarTab; icon: string; label: string }[] = [
-  { id: 'participants', icon: 'group', label: 'People' },
-  { id: 'chat', icon: 'chat', label: 'Chat' },
-  { id: 'polls', icon: 'bar_chart', label: 'Polls' },
-  { id: 'qa', icon: 'help', label: 'Q&A' },
-];
-
-const QA_QUESTIONS = [
-  { id: '1', text: 'Can you share your screen for the demo?', author: 'Sarah Johnson', votes: 5, answered: false },
-  { id: '2', text: 'What is the timeline for the next release?', author: 'Michael Chen', votes: 3, answered: true },
-];
+interface TabDef { id: SidebarTab; icon: string; label: string; hostOnly?: boolean; badgeFn?: () => number }
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PollPanelComponent],
   template: `
     <div class="sidebar-panel">
       <!-- Tab bar -->
       <div class="sidebar-tabs">
         <div class="tabs-scroll">
           <button
-            *ngFor="let tab of tabs"
+            *ngFor="let tab of visibleTabs()"
             class="sidebar-tab"
             [class.active]="ms.sidebarTab() === tab.id"
             (click)="ms.toggleSidebar(tab.id)"
           >
             <span class="material-symbols-outlined">{{ tab.icon }}</span>
             <span>{{ tab.label }}</span>
+            <span class="tab-badge" *ngIf="tab.badgeFn && tab.badgeFn() > 0">{{ tab.badgeFn() }}</span>
             <div class="tab-indicator" *ngIf="ms.sidebarTab() === tab.id"></div>
           </button>
         </div>
@@ -44,51 +40,115 @@ const QA_QUESTIONS = [
       <!-- Panel content -->
       <div class="sidebar-content">
 
-        <!-- Participants -->
+        <!-- ── Participants ── -->
         <ng-container *ngIf="ms.sidebarTab() === 'participants'">
           <div class="participants-panel">
-            <div class="participants-count">{{ ms.participants().length }} participants</div>
-            <div class="participants-list">
-              <p class="section-header" *ngIf="host">HOST</p>
-              <div class="participant-row" *ngIf="host">
-                <div class="p-avatar" [style.background]="host.avatarColor">{{ host.initials }}</div>
+            <div class="participants-header">
+              <span class="header-label">{{ (activeParticipants()?.length || 0) }} người tham gia</span>
+              <button class="icon-btn" (click)="loadActiveParticipants()" title="Làm mới">
+                <span class="material-symbols-outlined" [class.spin]="isLoadingParticipants()">refresh</span>
+              </button>
+            </div>
+
+            <div class="participants-list" *ngIf="activeParticipants()">
+
+              <!-- Host row -->
+              <p class="section-label" *ngIf="host">👑 HOST</p>
+              <div class="participant-row host-row" *ngIf="host">
+                <div class="p-avatar"
+                     [style.background-image]="host.avatarUrl ? 'url(' + host.avatarUrl + ')' : ''"
+                     [style.background-color]="getAvatarColor(host.id)">
+                  {{ !host.avatarUrl ? getInitials(host) : '' }}
+                </div>
                 <div class="p-info">
-                  <div class="p-name-row">
-                    <span class="p-name">{{ host.name }}</span>
-                    <span class="material-symbols-outlined host-crown">workspace_premium</span>
-                  </div>
-                  <span class="p-hand" *ngIf="host.isHandRaised">✋ Raised hand</span>
+                  <span class="p-name">{{ host.firstName }} {{ host.lastName }}</span>
+                  <span class="host-badge">Host</span>
                 </div>
                 <div class="p-status-icons">
-                  <span class="material-symbols-outlined status-icon" *ngIf="!host.isCameraOn">videocam_off</span>
-                  <span class="material-symbols-outlined status-icon" [class.muted]="host.isMuted">{{ host.isMuted ? 'mic_off' : 'mic' }}</span>
+                  <span class="status-icon" *ngIf="isHandRaised(host.id)" title="Đang giơ tay">✋</span>
                 </div>
               </div>
 
-              <p class="section-header mt-2">PARTICIPANTS</p>
-              <div class="participant-row" *ngFor="let p of others">
-                <div class="p-avatar" [style.background]="p.avatarColor">{{ p.initials }}</div>
+              <!-- Participants -->
+              <p class="section-label mt-2" *ngIf="others.length > 0">PARTICIPANTS</p>
+              <div class="participant-row" *ngFor="let p of others; trackBy: trackById">
+                <div class="p-avatar"
+                     [style.background-image]="p.avatarUrl ? 'url(' + p.avatarUrl + ')' : ''"
+                     [style.background-color]="getAvatarColor(p.id)">
+                  {{ !p.avatarUrl ? getInitials(p) : '' }}
+                </div>
                 <div class="p-info">
                   <div class="p-name-row">
-                    <span class="p-name">{{ p.name }}</span>
-                    <span class="p-you" *ngIf="p.id === 'local'">(You)</span>
+                    <span class="p-name">{{ p.firstName }} {{ p.lastName }}</span>
+                    <span class="p-you-tag" *ngIf="p.id === _localId">(Bạn)</span>
                   </div>
-                  <span class="p-hand" *ngIf="p.isHandRaised">✋ Raised hand</span>
+                  <div class="p-hand-state" *ngIf="isHandRaised(p.id)">
+                    <span>✋</span> Đang giơ tay
+                  </div>
                 </div>
                 <div class="p-status-icons">
-                  <span class="material-symbols-outlined status-icon" *ngIf="!p.isCameraOn">videocam_off</span>
-                  <span class="material-symbols-outlined status-icon" [class.muted]="p.isMuted">{{ p.isMuted ? 'mic_off' : 'mic' }}</span>
+                  <span class="status-icon hand" *ngIf="isHandRaised(p.id)" [title]="p.firstName + ' đang giơ tay'">✋</span>
+                </div>
+                <div class="p-actions" *ngIf="ms.isHost() && p.id !== _localId">
+                  <button class="action-btn" title="Tắt mic" (click)="muteParticipant(p)">
+                    <span class="material-symbols-outlined">mic_off</span>
+                  </button>
+                  <button class="action-btn danger" title="Kick" (click)="kickParticipant(p)">
+                    <span class="material-symbols-outlined">person_remove</span>
+                  </button>
                 </div>
               </div>
             </div>
+
             <div class="participants-footer">
-              <button class="footer-btn secondary">Mute All</button>
-              <button class="footer-btn primary">Invite</button>
+              <button class="footer-btn secondary" *ngIf="ms.isHost()" (click)="muteAll()">Mute All</button>
+              <button class="footer-btn primary">Mời tham gia</button>
             </div>
           </div>
         </ng-container>
 
-        <!-- Chat -->
+        <!-- ── Waiting Room (Host only) ── -->
+        <ng-container *ngIf="ms.sidebarTab() === 'waiting'">
+          <div class="waiting-panel">
+            <div class="waiting-header">
+              <span>Phòng chờ · {{ ms.waitingParticipants().length }}</span>
+              <button class="admit-all-btn"
+                      *ngIf="ms.waitingParticipants().length > 0"
+                      (click)="ms.admitAllWaiting()">
+                ✓ Duyệt tất cả
+              </button>
+            </div>
+
+            <div class="waiting-list">
+              <div class="waiting-empty" *ngIf="ms.waitingParticipants().length === 0">
+                <span class="material-symbols-outlined">hourglass_empty</span>
+                <p>Không có ai trong phòng chờ</p>
+              </div>
+
+              <div class="waiting-row" *ngFor="let p of ms.waitingParticipants(); trackBy: trackWaitingById">
+                <div class="p-avatar"
+                     [style.background-image]="p.avatarUrl ? 'url(' + p.avatarUrl + ')' : ''"
+                     [style.background-color]="getAvatarColor(p.id)">
+                  {{ !p.avatarUrl ? getWaitingInitials(p) : '' }}
+                </div>
+                <div class="p-info">
+                  <span class="p-name">{{ p.firstName }} {{ p.lastName }}</span>
+                  <span class="waiting-status-tag">Đang chờ...</span>
+                </div>
+                <div class="waiting-actions">
+                  <button class="w-action-btn approve" (click)="ms.approveWaitingUser(p.id)" title="Duyệt">
+                    <span class="material-symbols-outlined">check</span>
+                  </button>
+                  <button class="w-action-btn reject" (click)="ms.rejectWaitingUser(p.id)" title="Từ chối">
+                    <span class="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+        <!-- ── Chat ── -->
         <ng-container *ngIf="ms.sidebarTab() === 'chat'">
           <div class="chat-panel">
             <div class="chat-messages" #chatMessages>
@@ -114,11 +174,8 @@ const QA_QUESTIONS = [
               </button>
               <input class="chat-input"
                      [(ngModel)]="chatInput"
-                     placeholder="Message everyone..."
+                     placeholder="Nhắn tin cho mọi người..."
                      (keydown.enter)="sendMsg()" />
-              <button class="chat-icon-btn">
-                <span class="material-symbols-outlined">attach_file</span>
-              </button>
               <button class="chat-send-btn" [disabled]="!chatInput.trim()" (click)="sendMsg()">
                 <span class="material-symbols-outlined">send</span>
               </button>
@@ -126,52 +183,9 @@ const QA_QUESTIONS = [
           </div>
         </ng-container>
 
-        <!-- Polls -->
+        <!-- ── Polls ── -->
         <ng-container *ngIf="ms.sidebarTab() === 'polls'">
-          <div class="polls-panel">
-            <div *ngFor="let poll of ms.polls()" class="poll-card">
-              <p class="poll-question">{{ poll.question }}</p>
-              <div class="poll-options">
-                <button *ngFor="let opt of poll.options"
-                        class="poll-option"
-                        [class.voted]="poll.votedOption === opt.id"
-                        [class.revealed]="!!poll.votedOption"
-                        [disabled]="!!poll.votedOption"
-                        (click)="ms.vote(poll.id, opt.id)">
-                  <div class="poll-fill" *ngIf="poll.votedOption"
-                       [style.width]="getPct(opt.votes, poll.totalVotes) + '%'"></div>
-                  <div class="poll-option-content">
-                    <span class="material-symbols-outlined voted-check" *ngIf="poll.votedOption === opt.id">check</span>
-                    <span class="opt-text">{{ opt.text }}</span>
-                    <span class="opt-pct" *ngIf="poll.votedOption">{{ getPct(opt.votes, poll.totalVotes) }}%</span>
-                  </div>
-                </button>
-              </div>
-              <p class="poll-total" *ngIf="poll.votedOption">{{ poll.totalVotes }} votes total</p>
-            </div>
-            <div class="polls-empty" *ngIf="ms.polls().length === 0">
-              <span class="material-symbols-outlined">bar_chart</span>
-              <p>No active polls</p>
-            </div>
-          </div>
-        </ng-container>
-
-        <!-- Q&A -->
-        <ng-container *ngIf="ms.sidebarTab() === 'qa'">
-          <div class="qa-panel">
-            <div *ngFor="let q of qaQuestions" class="qa-card" [class.answered]="q.answered">
-              <p class="qa-text">{{ q.text }}</p>
-              <div class="qa-meta">
-                <span class="qa-author">{{ q.author }}</span>
-                <div class="qa-right">
-                  <span class="answered-badge" *ngIf="q.answered">
-                    <span class="material-symbols-outlined">check</span> Answered
-                  </span>
-                  <button class="upvote-btn">↑ {{ q.votes }}</button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <app-poll-panel></app-poll-panel>
         </ng-container>
 
       </div>
@@ -179,20 +193,163 @@ const QA_QUESTIONS = [
   `,
   styleUrls: ['./sidebar.component.scss']
 })
-export class SidebarComponent implements AfterViewChecked {
+export class SidebarComponent implements AfterViewChecked, OnDestroy {
   ms = inject(MeetingStateService);
-  tabs = TABS;
+  meetingService = inject(MeetingService);
+  hostControlService = inject(HostControlService);
+  authService = inject(AuthService);
+
   chatInput = '';
-  qaQuestions = QA_QUESTIONS;
+
+  activeParticipants = signal<ParticipantDto[] | null>(null);
+  isLoadingParticipants = signal(false);
 
   @ViewChild('chatBottom') private chatBottom!: ElementRef;
 
-  get host(): Participant | undefined {
-    return this.ms.participants().find(p => p.isHost);
+  private _refreshInterval: ReturnType<typeof setInterval> | null = null;
+  private _subs = new Subscription();
+
+  private readonly ALL_TABS: TabDef[] = [
+    { id: 'participants', icon: 'group', label: 'People' },
+    {
+      id: 'waiting',
+      icon: 'hourglass_bottom',
+      label: 'Phòng chờ',
+      hostOnly: true,
+      badgeFn: () => this.ms.waitingParticipants().length
+    },
+    {
+      id: 'chat',
+      icon: 'chat',
+      label: 'Chat',
+      badgeFn: () => this.ms.unreadMessages()
+    },
+    { id: 'polls', icon: 'bar_chart', label: 'Polls' }
+  ];
+
+  visibleTabs = computed(() => {
+    const isHost = this.ms.isHost();
+    return this.ALL_TABS.filter(t => !t.hostOnly || isHost);
+  });
+
+  constructor() {
+    // Reload participants each time the People tab becomes active
+    effect(() => {
+      const tab = this.ms.sidebarTab();
+      if (tab === 'participants' && this.ms.meetingCode()) {
+        this.loadActiveParticipants();
+        // Auto-refresh every 30s while tab is open
+        this._clearRefreshInterval();
+        this._refreshInterval = setInterval(() => {
+          if (this.ms.sidebarTab() === 'participants') {
+            this.loadActiveParticipants();
+          }
+        }, 30_000);
+      } else {
+        this._clearRefreshInterval();
+      }
+
+      // Refresh waiting room list each time the Waiting tab becomes active
+      if (tab === 'waiting' && this.ms.isHost()) {
+        this.ms.loadWaitingRoom();
+      }
+    });
   }
-  get others(): Participant[] {
-    return this.ms.participants().filter(p => !p.isHost);
+
+  ngOnDestroy(): void {
+    this._clearRefreshInterval();
+    this._subs.unsubscribe();
   }
+
+  private _clearRefreshInterval(): void {
+    if (this._refreshInterval) {
+      clearInterval(this._refreshInterval);
+      this._refreshInterval = null;
+    }
+  }
+
+  get _localId(): string {
+    return this.authService.getCurrentUser()?.id || '';
+  }
+
+  loadActiveParticipants() {
+    if (this.isLoadingParticipants()) return; // Prevent double call
+    this.isLoadingParticipants.set(true);
+    // Use /participants/sidebar which returns only active (non-waiting) participants
+    this.meetingService.getSidebarParticipants(this.ms.meetingCode()).subscribe({
+      next: (res) => {
+        this.activeParticipants.set(res);
+        this.isLoadingParticipants.set(false);
+      },
+      error: (err) => {
+        console.error('Failed to load sidebar participants', err);
+        // Fallback: try the general endpoint
+        this.meetingService.getAllParticipants(this.ms.meetingCode()).subscribe({
+          next: (res) => this.activeParticipants.set(res),
+          error: () => {}
+        });
+        this.isLoadingParticipants.set(false);
+      }
+    });
+  }
+
+  muteParticipant(p: ParticipantDto) {
+    if (!this.ms.isHost()) return;
+    this.hostControlService.sendCommand(this.ms.meetingCode(), 'MUTE_ALL' as any, p.id).subscribe({
+      next: () => this.ms.showToast(`Đã tắt mic ${p.firstName}`, 'success'),
+      error: () => this.ms.showToast('Không thể tắt mic', 'error')
+    });
+  }
+
+  muteAll() {
+    if (!this.ms.isHost()) return;
+    this.hostControlService.sendCommand(this.ms.meetingCode(), 'MUTE_ALL').subscribe({
+      next: () => this.ms.showToast('🔇 Đã tắt mic tất cả', 'success'),
+      error: () => this.ms.showToast('Lỗi khi mute all', 'error')
+    });
+  }
+
+  kickParticipant(p: ParticipantDto) {
+    if (!this.ms.isHost()) return;
+    this.hostControlService.sendCommand(this.ms.meetingCode(), 'KICK_PARTICIPANT', p.id).subscribe({
+      next: () => {
+        this.ms.showToast(`${p.firstName} đã bị xoá khỏi phòng`, 'success');
+        this.loadActiveParticipants();
+      },
+      error: () => this.ms.showToast('Không thể kick participant', 'error')
+    });
+  }
+
+  /** Check if a participant (by backend ID) has their hand raised */
+  isHandRaised(userId: string): boolean {
+    return this.ms.raisedHandList().some(p => p.id === userId);
+  }
+
+  getInitials(p: ParticipantDto): string {
+    return ((p.firstName?.[0] || '') + (p.lastName?.[0] || '')).toUpperCase() || '?';
+  }
+
+  getWaitingInitials(p: WaitingParticipantDto): string {
+    return ((p.firstName?.[0] || '') + (p.lastName?.[0] || '')).toUpperCase() || '?';
+  }
+
+  getAvatarColor(id: string): string {
+    const colors = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#34d399', '#2dd4bf', '#38bdf8', '#818cf8', '#a78bfa', '#e879f9', '#f43f5e'];
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  get host(): ParticipantDto | undefined {
+    return this.activeParticipants()?.find(p => p.status === 'HOST');
+  }
+
+  get others(): ParticipantDto[] {
+    return this.activeParticipants()?.filter(p => p.status !== 'HOST') || [];
+  }
+
+  trackById(_: number, p: ParticipantDto) { return p.id; }
+  trackWaitingById(_: number, p: WaitingParticipantDto) { return p.id; }
 
   ngAfterViewChecked() {
     this.chatBottom?.nativeElement?.scrollIntoView({ behavior: 'smooth' });
@@ -202,10 +359,6 @@ export class SidebarComponent implements AfterViewChecked {
     if (!this.chatInput.trim()) return;
     this.ms.sendMessage(this.chatInput.trim());
     this.chatInput = '';
-  }
-
-  getPct(votes: number, total: number): number {
-    return total > 0 ? Math.round((votes / total) * 100) : 0;
   }
 
   getParticipantColor(senderId: string): string {

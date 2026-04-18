@@ -1,7 +1,8 @@
-import { Component, Input, computed, signal } from '@angular/core';
+import { Component, Input, computed, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { VideoTileComponent } from '../video-tile/video-tile.component';
 import { Participant } from '../../models/meeting.model';
+import { MeetingStateService } from '../../services/meeting-state.service';
 
 const PAGE_SIZE = 9;
 
@@ -21,12 +22,12 @@ function getGridConfig(count: number): { cols: number; rows: number } {
   template: `
     <div class="video-grid-container">
       <!-- Grid -->
-      <div class="video-grid" [style]="gridStyle()">
+      <div class="video-grid" [class]="'layout-' + ms.layoutMode()" [style]="gridStyle()">
         <app-video-tile
           *ngFor="let p of currentPageParticipants(); trackBy: trackById; let i = index"
           [participant]="p"
           [isLocal]="p.id === localParticipantId"
-          [ngClass]="{'tile-featured': isFeatured(i)}"
+          [ngClass]="{'tile-featured': isFeatured(i, p)}"
         ></app-video-tile>
       </div>
 
@@ -60,6 +61,7 @@ function getGridConfig(count: number): { cols: number; rows: number } {
   styleUrls: ['./video-grid.component.scss']
 })
 export class VideoGridComponent {
+  ms = inject(MeetingStateService);
   /**
    * FIX: _participants is now a Signal (was plain property).
    * Angular computed() only tracks Signal dependencies.
@@ -70,12 +72,17 @@ export class VideoGridComponent {
   private _currentPage = signal(0);
 
   @Input() set participants(value: Participant[]) {
-    // Sort: camera-on first, then speaking, then host
+    // Sort: theo quyền ưu tiên ổn định: isLocal > isHost > theo Alphabet
     const sorted = [...value].sort((a, b) => {
-      if (a.isCameraOn !== b.isCameraOn) return a.isCameraOn ? -1 : 1;
-      if (a.isSpeaking !== b.isSpeaking) return a.isSpeaking ? -1 : 1;
+      const aIsLocal = a.id === this.localParticipantId;
+      const bIsLocal = b.id === this.localParticipantId;
+      if (aIsLocal !== bIsLocal) return aIsLocal ? -1 : 1;
+      
       if (a.isHost !== b.isHost) return a.isHost ? -1 : 1;
-      return 0;
+      if (a.isCameraOn !== b.isCameraOn) return a.isCameraOn ? -1 : 1;
+      
+      // Sắp xếp bằng name để ổn định thứ tự thẻ
+      return (a.name || '').localeCompare(b.name || '');
     });
     this._participants.set(sorted);   // ← signal.set() triggers computed invalidation
     // Reset page if out of range
@@ -99,15 +106,26 @@ export class VideoGridComponent {
 
   gridStyle = computed(() => {
     const count = this.currentPageParticipants().length;
-    const { cols, rows } = getGridConfig(count);
-    return {
-      'grid-template-columns': `repeat(${cols}, minmax(0, 1fr))`,
-      'grid-template-rows': `repeat(${rows}, minmax(0, 1fr))`
-    };
+    const mode = this.ms.layoutMode();
+    
+    // Nếu chạy gallery hoặc dynamic thì dùng grid layout calc code cũ
+    if (mode === 'gallery' || mode === 'dynamic') {
+      const { cols, rows } = getGridConfig(count);
+      return {
+        'grid-template-columns': `repeat(${cols}, minmax(0, 1fr))`,
+        'grid-template-rows': `repeat(${rows}, minmax(0, 1fr))`
+      };
+    }
+    
+    // Speaker & Multi-speaker CSS flex/grid sẽ xử lý trong .scss thông qua class map
+    return {};
   });
 
-  isFeatured(index: number): boolean {
-    return this.currentPageParticipants().length === 8 && index < 2;
+  isFeatured(index: number, p: Participant): boolean {
+    const mode = this.ms.layoutMode();
+    if (mode === 'speaker') return index === 0;
+    if (mode === 'dynamic') return this.currentPageParticipants().length === 8 && index < 2;
+    return false;
   }
 
   prevPage() { if (this._currentPage() > 0) this._currentPage.update(v => v - 1); }
