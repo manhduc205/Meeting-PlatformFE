@@ -22,8 +22,16 @@
     </div>
   </div>
 
+  <!-- ===== RECONNECTING OVERLAY (Zoom-style — semi-transparent, non-blocking) ===== -->
+  <div class="vc-reconnecting" *ngIf="ms.connectionState() === 'reconnecting'">
+    <div class="reconnecting-pill">
+      <div class="reconnecting-spinner"></div>
+      <span>Reconnecting…</span>
+    </div>
+  </div>
+
   <!-- ===== LEFT: Meeting view ===== -->
-  <ng-container *ngIf="!ms.hasLeft() && ms.connectionState() === 'connected'">
+  <ng-container *ngIf="!ms.hasLeft() && (ms.connectionState() === 'connected' || ms.connectionState() === 'reconnecting')">
 
     <!-- Top bar -->
     <app-top-bar
@@ -40,10 +48,11 @@
       <!-- Video area + overlays -->
       <div class="vc-video-area">
 
-        <!-- Screen sharing banner -->
+        <!-- Screen sharing banner (when LOCAL user is sharing) -->
         <div class="sharing-banner" *ngIf="ms.isScreenSharing()">
           <span class="sharing-dot"></span>
           You are sharing your screen
+          <button class="sharing-stop-btn" (click)="ms.toggleScreenShare()">Stop sharing</button>
         </div>
 
         <!-- ===== REACTION ANIMATION OVERLAY ===== -->
@@ -51,6 +60,7 @@
           <div
             *ngFor="let r of floatingReactions()"
             class="reaction-particle"
+            [class.reaction-me]="r.isMe"
             [style.left.%]="r.xOffset"
           >
             <span class="reaction-emoji">{{ r.emoji }}</span>
@@ -76,7 +86,7 @@
           ></app-video-grid>
         </div>
 
-        <!-- Whiteboard — use [hidden] NOT *ngIf so the canvas content is preserved when toggled off -->
+        <!-- Whiteboard — use [hidden] NOT *ngIf so canvas content is preserved when toggled off -->
         <app-whiteboard [hidden]="!ms.showWhiteboard()"></app-whiteboard>
 
         <!-- Control bar -->
@@ -89,7 +99,7 @@
           (closePanel)="ms.showHostTools.set(false)"
         ></app-host-tools-panel>
 
-        <!-- Raised Hands Panel — visible to host when raisedHandCount > 0 -->
+        <!-- Raised Hands Panel -->
         <app-raised-hands-panel
           *ngIf="ms.showRaisedHands()"
           (closePanel)="ms.showRaisedHands.set(false)"
@@ -121,5 +131,6 @@
       </div>
     </div>
   </div>
+
 
 </div>

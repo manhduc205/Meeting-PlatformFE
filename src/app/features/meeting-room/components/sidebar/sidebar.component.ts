@@ -1,11 +1,14 @@
-import { Component, inject, signal, ViewChild, ElementRef, AfterViewChecked, OnDestroy, effect, computed } from '@angular/core';
+import {
+  Component, inject, signal, computed,
+  ViewChild, ElementRef, AfterViewChecked, OnDestroy, effect
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MeetingStateService } from '../../services/meeting-state.service';
-import { SidebarTab, Participant } from '../../models/meeting.model';
-import { MeetingService, ParticipantDto, WaitingParticipantDto } from '../../../../core/services/meeting.service';
+import { SidebarTab } from '../../models/meeting.model';
+import { MeetingService } from '../../../../core/services/meeting.service';
 import { HostControlService } from '../../services/host-control.service';
-import { AuthService } from '../../../auth/auth.service';
+import { ParticipantDto } from '../../../../core/services/meeting.service';
 import { PollPanelComponent } from '../poll-panel/poll-panel.component';
 import { Subscription } from 'rxjs';
 
@@ -40,111 +43,164 @@ interface TabDef { id: SidebarTab; icon: string; label: string; hostOnly?: boole
       <!-- Panel content -->
       <div class="sidebar-content">
 
-        <!-- ── Participants ── -->
+        <!-- ── Participants (Zoom-style, with inline waiting room for host) ── -->
         <ng-container *ngIf="ms.sidebarTab() === 'participants'">
           <div class="participants-panel">
-            <div class="participants-header">
-              <span class="header-label">{{ (activeParticipants()?.length || 0) }} người tham gia</span>
-              <button class="icon-btn" (click)="loadActiveParticipants()" title="Làm mới">
-                <span class="material-symbols-outlined" [class.spin]="isLoadingParticipants()">refresh</span>
-              </button>
+
+            <!-- Header -->
+            <div class="p-panel-header">
+              <span class="p-panel-title">Participants ({{ sidebarParticipants().length }})</span>
+              <div class="p-panel-actions">
+                <button class="p-icon-btn" title="Làm mới" (click)="refresh()">
+                  <span class="material-symbols-outlined" [class.spin]="isRefreshing()">refresh</span>
+                </button>
+                <button class="p-icon-btn" (click)="ms.sidebarTab.set(null)" title="Đóng">
+                  <span class="material-symbols-outlined">close</span>
+                </button>
+              </div>
             </div>
 
-            <div class="participants-list" *ngIf="activeParticipants()">
+            <!-- ══ WAITING ROOM SECTION (host only, shown above active participants) ══ -->
+            <div class="waiting-section" *ngIf="ms.isHost()">
+              <div class="waiting-section-header">
+                <div class="waiting-section-title">
+                  <span class="waiting-pulse-dot" *ngIf="ms.waitingParticipants().length > 0"></span>
+                  <span>Phòng chờ</span>
+                  <span class="waiting-count-badge" *ngIf="ms.waitingParticipants().length > 0">{{ ms.waitingParticipants().length }}</span>
+                </div>
+                <button class="admit-all-btn" *ngIf="ms.waitingParticipants().length > 0" (click)="ms.admitAllWaiting()">
+                  <span class="material-symbols-outlined">done_all</span>
+                  Duyệt tất cả
+                </button>
+              </div>
 
-              <!-- Host row -->
-              <p class="section-label" *ngIf="host">👑 HOST</p>
-              <div class="participant-row host-row" *ngIf="host">
-                <div class="p-avatar"
-                     [style.background-image]="host.avatarUrl ? 'url(' + host.avatarUrl + ')' : ''"
-                     [style.background-color]="getAvatarColor(host.id)">
-                  {{ !host.avatarUrl ? getInitials(host) : '' }}
+              <div class="waiting-list">
+                <div *ngIf="ms.waitingParticipants().length === 0" class="waiting-empty-state">
+                  Không có ai đang chờ
                 </div>
-                <div class="p-info">
-                  <span class="p-name">{{ host.firstName }} {{ host.lastName }}</span>
-                  <span class="host-badge">Host</span>
-                </div>
-                <div class="p-status-icons">
-                  <span class="status-icon" *ngIf="isHandRaised(host.id)" title="Đang giơ tay">✋</span>
+                <div
+                  class="waiting-row"
+                  *ngFor="let p of ms.waitingParticipants(); trackBy: trackById"
+                >
+                  <!-- Avatar -->
+                  <div class="p-avatar waiting-avatar"
+                       [style.background-image]="p.avatarUrl ? 'url(' + p.avatarUrl + ')' : ''"
+                       [style.background-color]="!p.avatarUrl ? getAvatarColor(p.id) : 'transparent'">
+                    <span *ngIf="!p.avatarUrl">{{ getInitials(p) }}</span>
+                  </div>
+
+                  <!-- Name -->
+                  <div class="p-info">
+                    <span class="p-name">{{ p.fullName || p.firstName }}</span>
+                    <span class="waiting-tag">Đang chờ...</span>
+                  </div>
+
+                  <!-- Approve / Reject buttons -->
+                  <div class="waiting-actions">
+                    <button
+                      class="w-btn approve"
+                      title="Cho phép vào"
+                      (click)="ms.approveWaitingUser(p.id)"
+                    >
+                      <span class="material-symbols-outlined">check</span>
+                    </button>
+                    <button
+                      class="w-btn reject"
+                      title="Từ chối"
+                      (click)="ms.rejectWaitingUser(p.id)"
+                    >
+                      <span class="material-symbols-outlined">close</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <!-- Participants -->
-              <p class="section-label mt-2" *ngIf="others.length > 0">PARTICIPANTS</p>
-              <div class="participant-row" *ngFor="let p of others; trackBy: trackById">
+              <!-- Divider between waiting and active -->
+              <div class="section-divider">
+                <span>Trong phòng</span>
+              </div>
+            </div>
+
+            <!-- ══ ACTIVE PARTICIPANTS LIST ══ -->
+            <div class="p-list">
+              <div *ngIf="sidebarParticipants().length === 0" class="p-empty">
+                <span class="material-symbols-outlined">group</span>
+                <p>Đang tải danh sách thành viên...</p>
+              </div>
+
+              <div
+                *ngFor="let p of sidebarParticipants(); trackBy: trackById"
+                class="p-row"
+                [class.p-row-me]="p.isMe"
+              >
+                <!-- Avatar -->
                 <div class="p-avatar"
                      [style.background-image]="p.avatarUrl ? 'url(' + p.avatarUrl + ')' : ''"
-                     [style.background-color]="getAvatarColor(p.id)">
-                  {{ !p.avatarUrl ? getInitials(p) : '' }}
+                     [style.background-color]="!p.avatarUrl ? getAvatarColor(p.id) : 'transparent'">
+                  <span *ngIf="!p.avatarUrl">{{ getInitials(p) }}</span>
                 </div>
+
+                <!-- Name + role tags -->
                 <div class="p-info">
-                  <div class="p-name-row">
-                    <span class="p-name">{{ p.firstName }} {{ p.lastName }}</span>
-                    <span class="p-you-tag" *ngIf="p.id === _localId">(Bạn)</span>
+                  <span class="p-name">
+                    {{ p.fullName || p.firstName }}
+                    <span class="p-role-tag" *ngIf="getRoleLabel(p)"> ({{ getRoleLabel(p) }})</span>
+                  </span>
+                  <span class="p-hand-label" *ngIf="p.status === 'RAISING_HAND'">✋ Đang giơ tay</span>
+                </div>
+
+                <!-- Status icons + host actions -->
+                <div class="p-right">
+                  <!-- Mic/Cam icons: only meaningful for local user -->
+                  <ng-container *ngIf="p.isMe">
+                    <span class="p-media-icon" [class.muted]="ms.isMuted()" title="Microphone">
+                      <span class="material-symbols-outlined">{{ ms.isMuted() ? 'mic_off' : 'mic' }}</span>
+                    </span>
+                    <span class="p-media-icon" [class.muted]="!ms.isCameraOn()" title="Camera">
+                      <span class="material-symbols-outlined">{{ ms.isCameraOn() ? 'videocam' : 'videocam_off' }}</span>
+                    </span>
+                  </ng-container>
+
+                  <!-- Host actions (show on hover, only for others) -->
+                  <div class="p-host-actions" *ngIf="ms.isHost() && !p.isMe">
+                    <button class="p-action-btn" title="Tắt mic" (click)="muteParticipant(p)">
+                      <span class="material-symbols-outlined">mic_off</span>
+                    </button>
+                    <button class="p-action-btn danger" title="Xoá khỏi phòng" (click)="kickParticipant(p)">
+                      <span class="material-symbols-outlined">person_remove</span>
+                    </button>
                   </div>
-                  <div class="p-hand-state" *ngIf="isHandRaised(p.id)">
-                    <span>✋</span> Đang giơ tay
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom action bar -->
+            <div class="p-footer">
+              <button class="p-footer-btn" id="invite-btn">Invite</button>
+              <button class="p-footer-btn" *ngIf="ms.isHost()" (click)="muteAll()">Mute all</button>
+              <div class="p-more-wrap" *ngIf="ms.isHost()">
+                <button class="p-footer-btn p-more-btn" (click)="toggleMoreMenu($event)" id="more-options-btn">···</button>
+                <div class="p-more-menu" *ngIf="showMoreMenu()" (click)="$event.stopPropagation()">
+                  <button class="p-more-item" (click)="askAllUnmute()">Ask all to unmute</button>
+                  <div class="p-more-divider"></div>
+                  <div class="p-more-toggle-row">
+                    <span>Mute all upon entry</span>
+                    <button class="toggle-btn" [class.on]="muteOnEntry()" (click)="muteOnEntry.update(v => !v)">
+                      <span class="toggle-knob"></span>
+                    </button>
                   </div>
-                </div>
-                <div class="p-status-icons">
-                  <span class="status-icon hand" *ngIf="isHandRaised(p.id)" [title]="p.firstName + ' đang giơ tay'">✋</span>
-                </div>
-                <div class="p-actions" *ngIf="ms.isHost() && p.id !== _localId">
-                  <button class="action-btn" title="Tắt mic" (click)="muteParticipant(p)">
-                    <span class="material-symbols-outlined">mic_off</span>
-                  </button>
-                  <button class="action-btn danger" title="Kick" (click)="kickParticipant(p)">
-                    <span class="material-symbols-outlined">person_remove</span>
-                  </button>
+                  <div class="p-more-toggle-row">
+                    <span>Play join and leave sound</span>
+                    <button class="toggle-btn" [class.on]="joinSound()" (click)="joinSound.update(v => !v)">
+                      <span class="toggle-knob"></span>
+                    </button>
+                  </div>
+                  <div class="p-more-divider"></div>
+                  <button class="p-more-item" (click)="showMoreMenu.set(false)">Host tools for participants</button>
                 </div>
               </div>
             </div>
 
-            <div class="participants-footer">
-              <button class="footer-btn secondary" *ngIf="ms.isHost()" (click)="muteAll()">Mute All</button>
-              <button class="footer-btn primary">Mời tham gia</button>
-            </div>
-          </div>
-        </ng-container>
-
-        <!-- ── Waiting Room (Host only) ── -->
-        <ng-container *ngIf="ms.sidebarTab() === 'waiting'">
-          <div class="waiting-panel">
-            <div class="waiting-header">
-              <span>Phòng chờ · {{ ms.waitingParticipants().length }}</span>
-              <button class="admit-all-btn"
-                      *ngIf="ms.waitingParticipants().length > 0"
-                      (click)="ms.admitAllWaiting()">
-                ✓ Duyệt tất cả
-              </button>
-            </div>
-
-            <div class="waiting-list">
-              <div class="waiting-empty" *ngIf="ms.waitingParticipants().length === 0">
-                <span class="material-symbols-outlined">hourglass_empty</span>
-                <p>Không có ai trong phòng chờ</p>
-              </div>
-
-              <div class="waiting-row" *ngFor="let p of ms.waitingParticipants(); trackBy: trackWaitingById">
-                <div class="p-avatar"
-                     [style.background-image]="p.avatarUrl ? 'url(' + p.avatarUrl + ')' : ''"
-                     [style.background-color]="getAvatarColor(p.id)">
-                  {{ !p.avatarUrl ? getWaitingInitials(p) : '' }}
-                </div>
-                <div class="p-info">
-                  <span class="p-name">{{ p.firstName }} {{ p.lastName }}</span>
-                  <span class="waiting-status-tag">Đang chờ...</span>
-                </div>
-                <div class="waiting-actions">
-                  <button class="w-action-btn approve" (click)="ms.approveWaitingUser(p.id)" title="Duyệt">
-                    <span class="material-symbols-outlined">check</span>
-                  </button>
-                  <button class="w-action-btn reject" (click)="ms.rejectWaitingUser(p.id)" title="Từ chối">
-                    <span class="material-symbols-outlined">close</span>
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         </ng-container>
 
@@ -195,28 +251,25 @@ interface TabDef { id: SidebarTab; icon: string; label: string; hostOnly?: boole
 })
 export class SidebarComponent implements AfterViewChecked, OnDestroy {
   ms = inject(MeetingStateService);
-  meetingService = inject(MeetingService);
   hostControlService = inject(HostControlService);
-  authService = inject(AuthService);
+  meetingService = inject(MeetingService);
 
   chatInput = '';
-
-  activeParticipants = signal<ParticipantDto[] | null>(null);
-  isLoadingParticipants = signal(false);
+  isRefreshing = signal(false);
+  showMoreMenu = signal(false);
+  muteOnEntry = signal(false);
+  joinSound = signal(true);
 
   @ViewChild('chatBottom') private chatBottom!: ElementRef;
-
-  private _refreshInterval: ReturnType<typeof setInterval> | null = null;
   private _subs = new Subscription();
 
   private readonly ALL_TABS: TabDef[] = [
-    { id: 'participants', icon: 'group', label: 'People' },
     {
-      id: 'waiting',
-      icon: 'hourglass_bottom',
-      label: 'Phòng chờ',
-      hostOnly: true,
-      badgeFn: () => this.ms.waitingParticipants().length
+      id: 'participants',
+      icon: 'group',
+      label: 'People',
+      // Badge shows total of waiting participants (for host only)
+      badgeFn: () => this.ms.isHost() ? this.ms.waitingParticipants().length : 0
     },
     {
       id: 'chat',
@@ -227,73 +280,55 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
     { id: 'polls', icon: 'bar_chart', label: 'Polls' }
   ];
 
-  visibleTabs = computed(() => {
-    const isHost = this.ms.isHost();
-    return this.ALL_TABS.filter(t => !t.hostOnly || isHost);
-  });
+  visibleTabs = computed(() => this.ALL_TABS);
+
+  /**
+   * Participants list driven directly by ms.backendParticipants().
+   * No local polling — data is refreshed by MeetingStateService via WebSocket events.
+   * Backend already sorts: HOST → isMe → RAISING_HAND → ACTIVE.
+   */
+  sidebarParticipants = computed(() => this.ms.backendParticipants());
 
   constructor() {
-    // Reload participants each time the People tab becomes active
+    // Close more menu when switching tabs
     effect(() => {
       const tab = this.ms.sidebarTab();
-      if (tab === 'participants' && this.ms.meetingCode()) {
-        this.loadActiveParticipants();
-        // Auto-refresh every 30s while tab is open
-        this._clearRefreshInterval();
-        this._refreshInterval = setInterval(() => {
-          if (this.ms.sidebarTab() === 'participants') {
-            this.loadActiveParticipants();
-          }
-        }, 30_000);
-      } else {
-        this._clearRefreshInterval();
-      }
-
-      // Refresh waiting room list each time the Waiting tab becomes active
-      if (tab === 'waiting' && this.ms.isHost()) {
-        this.ms.loadWaitingRoom();
-      }
+      if (tab !== 'participants') this.showMoreMenu.set(false);
     });
   }
 
   ngOnDestroy(): void {
-    this._clearRefreshInterval();
     this._subs.unsubscribe();
   }
 
-  private _clearRefreshInterval(): void {
-    if (this._refreshInterval) {
-      clearInterval(this._refreshInterval);
-      this._refreshInterval = null;
+  /** Manual refresh — calls /sidebar directly to update the list */
+  refresh(): void {
+    if (this.isRefreshing()) return;
+    this.isRefreshing.set(true);
+    this.meetingService.getSidebarParticipants(this.ms.meetingCode()).subscribe({
+      next: (res) => { this.ms.backendParticipants.set(res); this.isRefreshing.set(false); },
+      error: () => this.isRefreshing.set(false)
+    });
+    // Also refresh waiting room at the same time
+    if (this.ms.isHost()) {
+      this.ms.loadWaitingRoom();
     }
   }
 
-  get _localId(): string {
-    return this.authService.getCurrentUser()?.id || '';
+  toggleMoreMenu(event: MouseEvent): void {
+    event.stopPropagation();
+    this.showMoreMenu.update(v => !v);
   }
 
-  loadActiveParticipants() {
-    if (this.isLoadingParticipants()) return; // Prevent double call
-    this.isLoadingParticipants.set(true);
-    // Use /participants/sidebar which returns only active (non-waiting) participants
-    this.meetingService.getSidebarParticipants(this.ms.meetingCode()).subscribe({
-      next: (res) => {
-        this.activeParticipants.set(res);
-        this.isLoadingParticipants.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to load sidebar participants', err);
-        // Fallback: try the general endpoint
-        this.meetingService.getAllParticipants(this.ms.meetingCode()).subscribe({
-          next: (res) => this.activeParticipants.set(res),
-          error: () => {}
-        });
-        this.isLoadingParticipants.set(false);
-      }
-    });
+  /** Build the role label string: "Host, me" / "me" / "Host" / "" */
+  getRoleLabel(p: ParticipantDto): string {
+    const parts: string[] = [];
+    if (p.status === 'HOST') parts.push('Host');
+    if (p.isMe) parts.push('me');
+    return parts.join(', ');
   }
 
-  muteParticipant(p: ParticipantDto) {
+  muteParticipant(p: ParticipantDto): void {
     if (!this.ms.isHost()) return;
     this.hostControlService.sendCommand(this.ms.meetingCode(), 'MUTE_ALL' as any, p.id).subscribe({
       next: () => this.ms.showToast(`Đã tắt mic ${p.firstName}`, 'success'),
@@ -301,7 +336,7 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
     });
   }
 
-  muteAll() {
+  muteAll(): void {
     if (!this.ms.isHost()) return;
     this.hostControlService.sendCommand(this.ms.meetingCode(), 'MUTE_ALL').subscribe({
       next: () => this.ms.showToast('🔇 Đã tắt mic tất cả', 'success'),
@@ -309,47 +344,34 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
     });
   }
 
-  kickParticipant(p: ParticipantDto) {
+  askAllUnmute(): void {
+    this.showMoreMenu.set(false);
+    this.ms.showToast('📢 Đã yêu cầu mọi người bật mic', 'info');
+  }
+
+  kickParticipant(p: ParticipantDto): void {
     if (!this.ms.isHost()) return;
     this.hostControlService.sendCommand(this.ms.meetingCode(), 'KICK_PARTICIPANT', p.id).subscribe({
-      next: () => {
-        this.ms.showToast(`${p.firstName} đã bị xoá khỏi phòng`, 'success');
-        this.loadActiveParticipants();
-      },
+      next: () => this.ms.showToast(`${p.firstName} đã bị xoá khỏi phòng`, 'success'),
       error: () => this.ms.showToast('Không thể kick participant', 'error')
     });
   }
 
-  /** Check if a participant (by backend ID) has their hand raised */
-  isHandRaised(userId: string): boolean {
-    return this.ms.raisedHandList().some(p => p.id === userId);
-  }
-
   getInitials(p: ParticipantDto): string {
-    return ((p.firstName?.[0] || '') + (p.lastName?.[0] || '')).toUpperCase() || '?';
-  }
-
-  getWaitingInitials(p: WaitingParticipantDto): string {
-    return ((p.firstName?.[0] || '') + (p.lastName?.[0] || '')).toUpperCase() || '?';
+    if (p.fullName) {
+      return p.fullName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return ((p.firstName?.[0] || '') + ((p as any).lastName?.[0] || '')).toUpperCase() || '?';
   }
 
   getAvatarColor(id: string): string {
-    const colors = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#34d399', '#2dd4bf', '#38bdf8', '#818cf8', '#a78bfa', '#e879f9', '#f43f5e'];
+    const colors = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#34d399', '#2dd4bf', '#38bdf8', '#818cf8', '#a78bfa', '#e879f9'];
     let hash = 0;
     for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
     return colors[Math.abs(hash) % colors.length];
   }
 
-  get host(): ParticipantDto | undefined {
-    return this.activeParticipants()?.find(p => p.status === 'HOST');
-  }
-
-  get others(): ParticipantDto[] {
-    return this.activeParticipants()?.filter(p => p.status !== 'HOST') || [];
-  }
-
   trackById(_: number, p: ParticipantDto) { return p.id; }
-  trackWaitingById(_: number, p: WaitingParticipantDto) { return p.id; }
 
   ngAfterViewChecked() {
     this.chatBottom?.nativeElement?.scrollIntoView({ behavior: 'smooth' });

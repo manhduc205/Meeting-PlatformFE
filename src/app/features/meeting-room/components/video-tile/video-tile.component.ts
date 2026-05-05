@@ -19,42 +19,54 @@ import { Participant } from '../../models/meeting.model';
     <div
       class="video-tile"
       [class.speaking]="participant.isSpeaking"
+      [class.tile-screen-share]="isScreenShare"
+      [class.camera-toggling]="isCameraToggling"
     >
       <!--
-        FIX: <video> is ALWAYS in the DOM — no *ngIf.
-        Previously *ngIf destroyed the element on camera-off.
-        When camera turned back on, ngOnChanges fired BEFORE Angular
-        re-created the element, so videoEl was still undefined → stream never attached.
-        Solution: keep element alive, use CSS to hide/show.
+        <video> is ALWAYS in the DOM — no *ngIf.
+        Keeping the element alive means @ViewChild is always valid
+        and the stream can be re-attached when camera turns back on.
       -->
       <video
         #videoEl
         class="tile-video"
-        [class.mirrored]="isLocal"
+        [class.mirrored]="isLocal && !isScreenShare"
         [class.tile-video--hidden]="!participant.isCameraOn || !participant.stream"
+        [class.tile-video--screenshare]="isScreenShare"
         autoplay
         playsinline
         muted
       ></video>
 
-      <!-- Avatar fallback (camera off or no stream yet) -->
+      <!-- Avatar fallback: shown when camera off OR no stream yet -->
       <div
         *ngIf="!participant.isCameraOn || !participant.stream"
         class="tile-avatar-bg"
       >
-        <div
-          class="tile-avatar"
-          [style.background-image]="participant.avatarUrl ? 'url(' + participant.avatarUrl + ')' : ''"
-          [style.background-color]="participant.avatarUrl ? 'transparent' : participant.avatarColor"
-        >
-          <!-- Chỉ hiển thị initials nếu không có ảnh -->
-          <ng-container *ngIf="!participant.avatarUrl">
+        <div class="tile-avatar" [style.background-color]="avatarBgColor">
+          <!--
+            Priority: avatarUrl image > initials
+            (error) handler falls back to initials if avatar URL is broken
+          -->
+          <img
+            *ngIf="participant.avatarUrl && !avatarImgError"
+            [src]="participant.avatarUrl"
+            [alt]="participant.name"
+            class="tile-avatar-img"
+            (error)="onAvatarError()"
+          />
+          <span *ngIf="!participant.avatarUrl || avatarImgError" class="tile-avatar-initials">
             {{ participant.initials }}
-          </ng-container>
+          </span>
         </div>
       </div>
 
-      <!-- Speaking ring -->
+      <!-- Camera toggling spinner (Zoom-style loading state) -->
+      <div class="tile-toggling-overlay" *ngIf="isCameraToggling">
+        <div class="tile-toggling-spinner"></div>
+      </div>
+
+      <!-- Speaking ring — animated green border pulse (Google Meet style) -->
       <div class="speaking-ring" *ngIf="participant.isSpeaking"></div>
 
       <!-- Top-left: host badge -->
@@ -65,12 +77,20 @@ import { Participant } from '../../models/meeting.model';
           </svg>
           <span>Host</span>
         </div>
+        <!-- Screen share badge -->
+        <div class="screenshare-badge" *ngIf="participant.isScreenSharing && !isScreenShare">
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 3H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"/>
+            <path d="M8 21h8M12 17v4m5-14 5-5M17 3h5v5"/>
+          </svg>
+          <span>Sharing</span>
+        </div>
       </div>
 
       <!-- Top-right: raise hand badge -->
       <div class="raise-hand-badge" *ngIf="participant.isHandRaised">✋</div>
 
-      <!-- Top-right: camera off badge -->
+      <!-- Top-right: camera off badge (only when no hand raised) -->
       <div class="cam-off-badge" *ngIf="!participant.isCameraOn && !participant.isHandRaised">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2">
           <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10M1 1l22 22"/>
@@ -80,13 +100,12 @@ import { Participant } from '../../models/meeting.model';
       <!-- Bottom bar -->
       <div class="tile-bottom">
         <div class="tile-name-row">
-          <!-- Audio level bars -->
+          <!-- Audio level bars (animated from LiveKit audioLevel) -->
           <div class="audio-bars" *ngIf="participant.isSpeaking && !participant.isMuted">
             <span class="bar" [style.height.px]="barHeight(0)"></span>
             <span class="bar" [style.height.px]="barHeight(1)"></span>
             <span class="bar" [style.height.px]="barHeight(2)"></span>
           </div>
-          <span class="speaking-dot" *ngIf="participant.isSpeaking && !participant.audioLevel"></span>
           <span class="tile-you" *ngIf="isLocal">You · </span>
           <span class="tile-name">{{ participant.name }}</span>
         </div>
@@ -111,16 +130,34 @@ import { Participant } from '../../models/meeting.model';
 export class VideoTileComponent implements AfterViewInit, OnChanges, AfterViewChecked {
   @Input() participant!: Participant;
   @Input() isLocal = false;
-
   /**
-   * FIX: @ViewChild now always resolves because <video> is always in the DOM.
-   * Previously, with *ngIf, videoEl was undefined when camera was off,
-   * causing _attachStream() to bail early and stream never being attached
-   * when camera turned back on.
+   * isScreenShare: when true, this tile renders the screen-share stream
+   * with object-fit: contain (no cropping) instead of cover.
    */
+  @Input() isScreenShare = false;
+  /**
+   * isCameraToggling: when true, shows a subtle spinner overlay so the user
+   * knows the camera is in transition (same UX as Zoom).
+   */
+  @Input() isCameraToggling = false;
+
   @ViewChild('videoEl') videoEl!: ElementRef<HTMLVideoElement>;
 
+  /** Set to true when the avatar image fails to load — falls back to initials */
+  avatarImgError = false;
+
   private _needsAttach = false;
+  private _lastStream: MediaStream | null | undefined = undefined; // Track last attached stream
+
+  get avatarBgColor(): string {
+    return this.participant?.avatarUrl && !this.avatarImgError
+      ? 'transparent'
+      : (this.participant?.avatarColor || '#4f46e5');
+  }
+
+  onAvatarError(): void {
+    this.avatarImgError = true;
+  }
 
   ngAfterViewInit(): void {
     this._attachStream();
@@ -128,17 +165,15 @@ export class VideoTileComponent implements AfterViewInit, OnChanges, AfterViewCh
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['participant']) {
-      // Mark that we need to attach the stream.
-      // We use AfterViewChecked as a fallback in case videoEl isn't ready yet.
+      // Reset avatar error flag when participant changes (new person → new avatar URL)
+      if (changes['participant'].previousValue?.avatarUrl !== changes['participant'].currentValue?.avatarUrl) {
+        this.avatarImgError = false;
+      }
       this._needsAttach = true;
       this._attachStream();
     }
   }
 
-  /**
-   * AfterViewChecked fires after every view update.
-   * This catches the case where ngOnChanges ran but videoEl wasn't ready yet.
-   */
   ngAfterViewChecked(): void {
     if (this._needsAttach && this.videoEl) {
       this._attachStream();

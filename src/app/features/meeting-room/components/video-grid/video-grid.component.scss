@@ -1,3 +1,7 @@
+// ══════════════════════════════════════════════════════════════════════════
+//  VideoGrid — Standard grid + Zoom-style Presentation Layout
+// ══════════════════════════════════════════════════════════════════════════
+
 .video-grid-container {
   width: 100%;
   height: 100%;
@@ -6,6 +10,8 @@
   overflow: hidden;
   position: relative;
 }
+
+// ─── Standard grid ────────────────────────────────────────────────────────
 
 .video-grid {
   flex: 1;
@@ -16,38 +22,113 @@
   overflow: hidden;
   min-height: 0;
 
-  // Dynamic & Gallery (dùng inline style matrix)
-  // ...
-
-  // Chế độ Speaker: Nước lớn đè sóng nhỏ (1 to đùng, các cái sau nhỏ 150px trồi lên)
+  // Speaker layout: first tile full-width, others in a row below
   &.layout-speaker {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
-    grid-auto-rows: 150px !important; // Hàng phụ
+    grid-auto-rows: 150px !important;
     grid-template-rows: 1fr auto !important;
 
     app-video-tile:first-child {
-      grid-column: 1 / -1; // Căng ngang màn
-      grid-row: 1; // Chiếm trọn hàng 1 (co dãn lấy hết không gian thừa)
+      grid-column: 1 / -1;
+      grid-row: 1;
     }
 
     app-video-tile:not(:first-child) {
-      grid-row: 2; // Nằm dạt xuống hàng 2
+      grid-row: 2;
     }
-    
-    // Nếu chỉ có 1 mình
+
     app-video-tile:first-child:last-child {
       grid-row: 1 / -1;
     }
   }
 
-  // Chế độ Multi-speaker: Chia đều răm rắp, grid flex wrap
+  // Multi-speaker layout: auto-fit equal tiles
   &.layout-multi {
-    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)) !important;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
     grid-auto-rows: 1fr !important;
   }
 }
 
-// Page navigation
+// ─── Presentation Layout (Zoom-style screen sharing) ──────────────────────
+//
+//  ┌─────────────────────────────────────┬───────────┐
+//  │                                     │  Strip    │
+//  │      Screen Share Tile (flex:1)     │  (220px)  │
+//  │                                     │  scrollable│
+//  └─────────────────────────────────────┴───────────┘
+//
+.presentation-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  padding: 8px;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+// Left: the big screen-share video
+.presentation-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 10px;
+
+  app-video-tile {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// Right: scrollable strip of participant camera tiles
+.presentation-strip {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+
+  // Custom scrollbar (Chrome/Edge)
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+  }
+}
+
+.strip-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 2px 2px;
+  flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.strip-tile {
+  width: 100%;
+  height: 120px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+
+  app-video-tile {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+// ─── Page navigation ──────────────────────────────────────────────────────
+
 .page-nav {
   display: flex;
   align-items: center;
@@ -114,4 +195,5 @@
   color: rgba(255, 255, 255, 0.4);
   min-width: 40px;
   text-align: center;
+  font-family: 'Inter', sans-serif;
 }

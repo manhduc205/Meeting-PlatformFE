@@ -2,7 +2,8 @@ import { Component, OnInit, OnDestroy, OnChanges, inject, signal } from '@angula
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { MeetingStateService, ReactionEvent } from './services/meeting-state.service';
+import { MeetingStateService } from './services/meeting-state.service';
+import { MeetingActionService } from './services/meeting-action.service';
 import { TopBarComponent } from './components/top-bar/top-bar.component';
 import { VideoGridComponent } from './components/video-grid/video-grid.component';
 import { ControlBarComponent } from './components/control-bar/control-bar.component';
@@ -12,15 +13,6 @@ import { WhiteboardComponent } from './components/whiteboard/whiteboard.componen
 import { HostToolsPanelComponent } from './components/host-tools-panel/host-tools-panel.component';
 import { RaisedHandsPanelComponent } from './components/raised-hands-panel/raised-hands-panel.component';
 import { KnockNotificationsComponent } from './components/knock-notifications/knock-notifications.component';
-
-/** A single floating reaction particle on screen */
-interface FloatingReaction {
-  id: number;
-  emoji: string;
-  senderName: string;
-  /** Random horizontal offset so multiple reactions don't stack */
-  xOffset: number;
-}
 
 @Component({
   selector: 'app-video-call',
@@ -43,12 +35,13 @@ interface FloatingReaction {
 })
 export class VideoCallComponent implements OnInit, OnDestroy {
   ms = inject(MeetingStateService);
+  meetingAction = inject(MeetingActionService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private subs = new Subscription();
 
-  /** Active floating reaction particles */
-  floatingReactions = signal<FloatingReaction[]>([]);
+  /** Bind to the centralized flying reactions signal */
+  floatingReactions = this.meetingAction.flyingReactions;
 
   async ngOnInit() {
     const code = this.route.snapshot.queryParamMap.get('meetingId') ?? '';
@@ -60,30 +53,6 @@ export class VideoCallComponent implements OnInit, OnDestroy {
     }
 
     await this.ms.joinMeeting(code, title);
-
-    // Subscribe to reaction DataChannel events → animate floating emoji
-    this.subs.add(
-      this.ms.reaction$.subscribe((ev: ReactionEvent) => {
-        this._spawnReaction(ev);
-      })
-    );
-  }
-
-  private _spawnReaction(ev: ReactionEvent): void {
-    const particle: FloatingReaction = {
-      id: ev.id,
-      emoji: ev.emoji,
-      senderName: ev.senderName,
-      // Random horizontal position between 10% and 85% of screen width
-      xOffset: 10 + Math.random() * 75,
-    };
-
-    this.floatingReactions.update(list => [...list, particle]);
-
-    // Remove after animation completes (2.5 s)
-    setTimeout(() => {
-      this.floatingReactions.update(list => list.filter(r => r.id !== particle.id));
-    }, 2500);
   }
 
   async ngOnDestroy() {

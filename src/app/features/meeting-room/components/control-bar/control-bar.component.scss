@@ -130,8 +130,13 @@
     }
 
     @keyframes badgePop {
-      0%   { transform: scale(1.5); }
-      100% { transform: scale(1); }
+      0% {
+        transform: scale(1.5);
+      }
+
+      100% {
+        transform: scale(1);
+      }
     }
   }
 
@@ -163,9 +168,19 @@
   }
 
   @keyframes handWave {
-    0%, 100% { transform: rotate(0deg); }
-    25%  { transform: rotate(20deg); }
-    75%  { transform: rotate(-15deg); }
+
+    0%,
+    100% {
+      transform: rotate(0deg);
+    }
+
+    25% {
+      transform: rotate(20deg);
+    }
+
+    75% {
+      transform: rotate(-15deg);
+    }
   }
 
   // Host hands-alert button: pulsing amber when participants have raised hands
@@ -181,18 +196,31 @@
       animation: handsAlertPulse 1.8s ease-in-out infinite;
     }
 
-    &.active { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    &.active {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+    }
   }
 
   @keyframes handsAlertPulse {
-    0%, 100% { opacity: 0.5; transform: scale(1); }
-    50%       { opacity: 1;   transform: scale(1.04); }
+
+    0%,
+    100% {
+      opacity: 0.5;
+      transform: scale(1);
+    }
+
+    50% {
+      opacity: 1;
+      transform: scale(1.04);
+    }
   }
 
   // Waiting room alert: subtle amber glow when people are waiting
   &.waiting-alert {
     color: #fbbf24;
     position: relative;
+
     &::before {
       content: '';
       position: absolute;

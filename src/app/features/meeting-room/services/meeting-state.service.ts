@@ -12,8 +12,9 @@ import { PollService } from './poll.service';
 import { PollCreateRequest } from '../models/meeting.types';
 import { firstValueFrom } from 'rxjs';
 
-import { MeetingService, ParticipantDto, WaitingParticipantDto } from '../../../core/services/meeting.service';
-export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'error';
+import { MeetingService, ParticipantDto } from '../../../core/services/meeting.service';
+
+export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 export interface ReactionEvent {
   emoji: string;
@@ -48,6 +49,19 @@ export class MeetingStateService {
   isCameraOn = signal(true);     // true = camera ON
   isScreenSharing = signal(false);
 
+  /**
+   * isCameraToggling: true while setCameraEnabled() SDK call is in flight.
+   * Prevents double-click and shows loading state on the control bar button.
+   */
+  isCameraToggling = signal(false);
+
+  /**
+   * isLocalSpeaking: true when the local participant is an active speaker.
+   * Driven by LiveKit's ActiveSpeakersChanged event via media.isLocalSpeaking$.
+   * This powers the green speaking ring on the local video tile (Zoom behaviour).
+   */
+  isLocalSpeaking = signal(false);
+
   // ── Other UI signals ─────────────────────────────────────────────────────
   participants = signal<Participant[]>([]);
   backendParticipants = signal<ParticipantDto[]>([]);
@@ -68,17 +82,12 @@ export class MeetingStateService {
   localStream = signal<MediaStream | null>(null);
 
   // ── Waiting Room state (Host) ───────────────────────────────────────────────
-  waitingParticipants = signal<WaitingParticipantDto[]>([]);
+  waitingParticipants = signal<ParticipantDto[]>([]);
   /** Each knock notification pushed to host via WebSocket */
   hostKnockNotifications = signal<Array<{ id: string; firstName: string; lastName: string; userId: string; timestamp: number }>>([]);
 
   /**
    * Canonical list of participants who have raised their hand.
-   * ─────────────────────────────────────────────────────────────────────────
-   * Populated ONCE via GET on join. Delta-updated by WebSocket events:
-   *   RAISE → push only (no re-fetch)
-   *   LOWER → filter only (no re-fetch)
-   * Angular tracks items by id via trackBy in *ngFor — zero DOM re-render on push.
    */
   raisedHandList = signal<RaisedHandParticipant[]>([]);
 
@@ -86,10 +95,19 @@ export class MeetingStateService {
   readonly raisedHandCount = computed(() => this.raisedHandList().length);
 
   // ── DataChannel event streams ────────────────────────────────────────────
-  readonly reaction$ = new Subject<ReactionEvent>();
   readonly whiteboardDraw$ = new Subject<WhiteboardPayload>();
   readonly whiteboardClear$ = new Subject<void>();
 
+  /**
+   * localParticipant: Computed representation of the local (self) participant.
+   *
+   * Avatar URL priority:
+   *  1. backendParticipants avatarUrl (most accurate — from our own DB)
+   *  2. auth user picture (from Keycloak token — fast, available immediately)
+   *  3. undefined (shows initials as last resort)
+   *
+   * isSpeaking: driven by isLocalSpeaking() signal (LiveKit ActiveSpeakers).
+   */
   readonly localParticipant = computed<Participant | null>(() => {
     const user = this.auth.getCurrentUser();
     if (!user) return null;
@@ -97,17 +115,26 @@ export class MeetingStateService {
     // Look up avatar + full name from backend participant list for the local user
     const beInfo = this.backendParticipants().find(p => p.id === user.id);
 
+    // Avatar URL with multi-level fallback (backend → Keycloak picture → undefined)
+    const rawAvatarUrl = beInfo?.avatarUrl ?? user.picture ?? undefined;
+    const avatarUrl = rawAvatarUrl && rawAvatarUrl.trim().length > 0 ? rawAvatarUrl : undefined;
+
     return {
       id: 'local',
       name: beInfo?.fullName || user.name,
-      initials: (beInfo?.fullName || user.name).split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2),
+      initials: (beInfo?.fullName || user.name)
+        .split(' ')
+        .map((w: string) => w[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2),
       avatarColor: '#4f46e5',
-      // Use backend avatarUrl if available, otherwise undefined (shows initials)
-      avatarUrl: beInfo?.avatarUrl ?? undefined,
+      avatarUrl,
       isMuted: this.isMuted(),
       isCameraOn: this.isCameraOn(),
       isHost: this.isHost(),
-      isSpeaking: false,
+      // isLocalSpeaking() drives the speaking ring on the local tile (Zoom behaviour)
+      isSpeaking: this.isLocalSpeaking(),
       isHandRaised: this.isHandRaised(),
       isLocal: true,
       isScreenSharing: this.isScreenSharing(),
@@ -119,17 +146,21 @@ export class MeetingStateService {
   readonly allParticipants = computed<Participant[]>(() => {
     const backendData = this.backendParticipants();
     const local = this.localParticipant();
-    
-    // Ghi đè Name và cờ isHost từ dữ liệu chuẩn server
+
+    // Merge backend name/avatar/host data into remote LiveKit participants
     const remotes = this.participants().map(rp => {
       const beInfo = backendData.find(b => b.id === rp.id);
       if (beInfo) {
+        const rawUrl = beInfo.avatarUrl ?? undefined;
+        const avatarUrl = rawUrl && rawUrl.trim().length > 0 ? rawUrl : undefined;
         return {
           ...rp,
           name: beInfo.fullName || rp.name,
-          avatarUrl: beInfo.avatarUrl || undefined,
-          initials: beInfo.fullName ? beInfo.fullName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2) : rp.initials,
-          isHost: beInfo.status === 'HOST'
+          avatarUrl,
+          initials: beInfo.fullName
+            ? beInfo.fullName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+            : rp.initials,
+          isHost: beInfo.status === 'HOST',
         };
       }
       return rp;
@@ -138,12 +169,28 @@ export class MeetingStateService {
     return local ? [local, ...remotes] : remotes;
   });
 
+  /**
+   * screenShareParticipant: The participant currently sharing their screen.
+   * Used by VideoGridComponent to switch to "Presentation Layout" (Zoom-style).
+   * Priority: remote screen-sharer > local screen-sharer.
+   */
+  readonly screenShareParticipant = computed<Participant | null>(() => {
+    // Check remote participants first (remote screen share takes priority)
+    const remoteSS = this.allParticipants().find(p => !p.isLocal && p.isScreenSharing);
+    if (remoteSS) return remoteSS;
+
+    // Local user sharing
+    const local = this.localParticipant();
+    if (local?.isScreenSharing) return local;
+
+    return null;
+  });
+
   private subs = new Subscription();
   private _reactionCounter = 0;
   /**
-   * When REST createPoll fails, we suppress the next incoming STOMP POLL_CREATED
-   * event for a short window (5s). This prevents a ghost poll from appearing on
-   * the UI if the backend broadcasts STOMP before returning the HTTP error.
+   * When REST createPoll fails, suppress the next incoming STOMP POLL_CREATED
+   * event for a short window to avoid ghost polls.
    */
   private _suppressNextPollCreated = false;
   private _suppressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -160,6 +207,7 @@ export class MeetingStateService {
     this.isMuted.set(false);
     this.isCameraOn.set(true);
     this.isScreenSharing.set(false);
+    this.isLocalSpeaking.set(false);
 
     const user = this.auth.getCurrentUser();
     if (!user) {
@@ -173,26 +221,22 @@ export class MeetingStateService {
       await this.media.connect(code);
       this.connectionState.set('connected');
 
-      // Fetch chuẩn host và thông tin UUID->Name từ REST API
-      this.meetingService.getAllParticipants(code).subscribe({
+      // Fetch host info and UUID→Name+isMe từ /sidebar (event-driven, chỉ gọi 1 lần khi join)
+      this.meetingService.getSidebarParticipants(code).subscribe({
         next: (res) => {
           this.backendParticipants.set(res);
-          const hostPart = res.find(p => p.status === 'HOST');
-          if (hostPart && hostPart.id === user.id) {
-            this.isHost.set(true);
-            // Immediately load waiting room for host
-            this.loadWaitingRoom();
-          } else {
-            this.isHost.set(false);
-          }
+          // Dùng isMe từ API thay vì so sánh ID thủ công
+          const isHost = res.some(p => p.isMe && p.status === 'HOST');
+          this.isHost.set(isHost);
+          if (isHost) this.loadWaitingRoom();
         },
-        error: (err: any) => console.error('Failed to load active participants on join', err)
+        error: (err: any) => console.error('Failed to load sidebar participants on join', err)
       });
 
     } catch (e) {
       console.error('[Meeting] Join failed', e);
       this.connectionState.set('error');
-      this.showToast('Failed to connect to meeting', 'error');
+      this.showToast('Failed to connect to meeting. Please check your connection and try again.', 'error');
       return;
     }
 
@@ -210,9 +254,14 @@ export class MeetingStateService {
       })
     );
 
-    // ── LiveKit hardware events — used to correct state if OS overrides ────
-    // e.g. user presses hardware mute button, unplugs headset, etc.
-    // These run AFTER the optimistic update, so they only matter for hardware events.
+    // ── Local speaking state (drives speaking ring on local tile) ─────────
+    this.subs.add(
+      this.media.isLocalSpeaking$.subscribe(isSpeaking => {
+        this.isLocalSpeaking.set(isSpeaking);
+      })
+    );
+
+    // ── LiveKit hardware events — correct state if OS overrides UI ────────
     this.subs.add(
       this.media.isMicEnabled$.subscribe(enabled => {
         this.isMuted.set(!enabled);
@@ -228,6 +277,19 @@ export class MeetingStateService {
     this.subs.add(
       this.media.isScreenSharing$.subscribe(sharing => {
         this.isScreenSharing.set(sharing);
+      })
+    );
+
+    // ── Reconnecting state ────────────────────────────────────────────────
+    this.subs.add(
+      this.media.reconnecting$.subscribe(isReconnecting => {
+        if (isReconnecting && this.connectionState() === 'connected') {
+          this.connectionState.set('reconnecting');
+          this.showToast('Connection lost. Reconnecting…', 'error');
+        } else if (!isReconnecting && this.connectionState() === 'reconnecting') {
+          this.connectionState.set('connected');
+          this.showToast('Reconnected successfully ✓', 'success');
+        }
       })
     );
 
@@ -255,6 +317,9 @@ export class MeetingStateService {
             this.showToast(`${chatMsg.senderName}: ${chatMsg.text}`, 'info');
           }
         }
+        if (msg.type === 'REACTION') {
+          this.meetingAction.handleReactionFromWebSocket(msg, this.backendParticipants());
+        }
         if (msg.type === 'MEETING_ENDED') {
           this.showToast('The host has ended the meeting', 'info');
           this.cleanupMedia();
@@ -263,38 +328,36 @@ export class MeetingStateService {
       })
     );
 
-    // ── STOMP: Presence (Để cập nhật Tên + Host khi có người vào/ra) ────────
+    // ── STOMP: Presence (update Name + Host when people join/leave) ────────
     this.subs.add(
       this.signaling.presence$.subscribe(msg => {
         if (msg.type === 'JOIN' || msg.type === 'USER_LIST_SYNC' || msg.type === 'LEAVE') {
-          this.meetingService.getAllParticipants(code).subscribe({
+          // Event-driven: gọi /sidebar để cập nhật danh sách khi có người vào/ra
+          this.meetingService.getSidebarParticipants(code).subscribe({
             next: (res) => this.backendParticipants.set(res),
-            error: (err: any) => console.error('Failed to reload participants', err)
+            error: (err: any) => console.error('Failed to reload sidebar participants', err)
           });
         }
       })
     );
 
-    // ── STOMP: Host Commands — /topic/meeting.{code}.commands ──────────────
+    // ── STOMP: Host Commands ───────────────────────────────────────────────
     this.subs.add(
       this.hostControl.commands$.subscribe(cmd => {
         this._handleHostCommand(cmd);
       })
     );
 
-    // ── STOMP: Raised Hands delta — /topic/meeting.{code}.raised-hands ─────
-    // Performance: push/filter ONLY. NEVER re-fetch API on delta update.
+    // ── STOMP: Raised Hands delta ─────────────────────────────────────────
     this.subs.add(
       this.meetingAction.raisedHands$.subscribe(event => {
         if (event.action === 'RAISE') {
-          // Deduplication guard: only add if not already in list
           this.raisedHandList.update(list => {
             const exists = list.some(p => p.id === event.data.id);
             return exists ? list : [...list, event.data];
           });
           this.showToast(`✋ ${event.data.fullName} raised their hand`, 'info');
         } else if (event.action === 'LOWER') {
-          // O(n) filter — remove the participant who lowered their hand
           this.raisedHandList.update(list =>
             list.filter(p => p.id !== event.userId)
           );
@@ -305,15 +368,14 @@ export class MeetingStateService {
     // ── Initial raised hands list (called ONCE on join) ────────────────────
     this._fetchInitialRaisedHands(code);
 
-    // ── STOMP: Poll events — /topic/meeting.{code}.polls ──────────────────
+    // ── STOMP: Poll events ─────────────────────────────────────────────────
     this.subs.add(
       this.pollService.polls$.subscribe(event => {
         if (event.action === 'POLL_CREATED') {
-          // Guard: if the REST call for THIS session failed, swallow the stale STOMP event
           if (this._suppressNextPollCreated) {
             this._suppressNextPollCreated = false;
             if (this._suppressTimer) { clearTimeout(this._suppressTimer); this._suppressTimer = null; }
-            return; // ← poll sẽ KHÔNG xuất hiện trên giao diện
+            return;
           }
           const p = event.data;
           const newPoll: Poll = {
@@ -335,24 +397,16 @@ export class MeetingStateService {
             this.showToast('📊 A new poll has started!', 'info');
           }
         } else if (event.action === 'VOTE_UPDATED') {
-          // Đã fix: Lấy cục newCounts từ Backend gửi về để đồng bộ chính xác tuyệt đối
           this.polls.update(list =>
             list.map(p => {
               if (p.id !== event.pollId) return p;
-
               let newTotal = 0;
               const updatedOptions = p.options.map(o => {
-                // Parse số đếm chuẩn từ Backend (Map mới nhất), k có thì mặc định 0
                 const count = parseInt((event as any).newCounts[o.id]) || 0;
                 newTotal += count;
                 return { ...o, voteCount: count };
               });
-
-              return {
-                ...p,
-                options: updatedOptions,
-                totalVotes: newTotal
-              };
+              return { ...p, options: updatedOptions, totalVotes: newTotal };
             })
           );
         } else if (event.action === 'POLL_CLOSED') {
@@ -364,12 +418,10 @@ export class MeetingStateService {
       })
     );
 
-    // ── STOMP: Host Notifications — /topic/meeting.{code}.host-notifications ──
-    // Host receives knock notifications when a user joins the waiting room
+    // ── STOMP: Host Knock Notifications ────────────────────────────────────
     this.subs.add(
       this.signaling.hostKnock$.subscribe(knock => {
         if (knock.type === 'NEW_KNOCK') {
-          // Show persistent toast for the host with action buttons
           const notif = {
             id: `knock-${Date.now()}-${Math.random()}`,
             firstName: knock.firstName,
@@ -378,7 +430,6 @@ export class MeetingStateService {
             timestamp: Date.now()
           };
           this.hostKnockNotifications.update(list => [...list, notif]);
-          // Also refresh the waiting room list
           this.loadWaitingRoom();
         }
       })
@@ -393,11 +444,6 @@ export class MeetingStateService {
   private _handleDataMessage(payload: any, participantIdentity: string): void {
     if (!payload?.type) return;
     switch (payload.type as string) {
-      case 'REACTION': {
-        const r = payload as ReactionPayload;
-        this.reaction$.next({ emoji: r.emoji, senderName: r.senderName, senderId: r.senderId, id: ++this._reactionCounter });
-        break;
-      }
       case 'WHITEBOARD_DRAW':
         this.whiteboardDraw$.next(payload as WhiteboardPayload);
         break;
@@ -419,6 +465,7 @@ export class MeetingStateService {
     this.waitingParticipants.set([]);
     this.hostKnockNotifications.set([]);
     this.isHandRaised.set(false);
+    this.isLocalSpeaking.set(false);
     this.connectionState.set('idle');
   }
 
@@ -435,7 +482,6 @@ export class MeetingStateService {
 
   approveWaitingUser(userId: string): void {
     const code = this.meetingCode();
-    // Optimistic
     this.waitingParticipants.update(list => list.filter(p => p.id !== userId));
     this.dismissKnockNotification(userId);
     this.meetingService.processWaitingRoom(code, { action: 'APPROVE', userIds: [userId] }).subscribe({
@@ -448,7 +494,6 @@ export class MeetingStateService {
 
   rejectWaitingUser(userId: string): void {
     const code = this.meetingCode();
-    // Optimistic
     this.waitingParticipants.update(list => list.filter(p => p.id !== userId));
     this.dismissKnockNotification(userId);
     this.meetingService.processWaitingRoom(code, { action: 'REJECT', userIds: [userId] }).subscribe({
@@ -480,32 +525,20 @@ export class MeetingStateService {
 
   // ── Private helpers ─────────────────────────────────────────────────────────────
 
-  /**
-   * Fetch initial raised hands ONCE on join.
-   * Populates raisedHandList. Never called again — deltas come via WebSocket.
-   */
   private async _fetchInitialRaisedHands(meetingCode: string): Promise<void> {
     try {
-      const res = await firstValueFrom(
-        this.meetingAction.getRaisedHands(meetingCode)
-      );
+      const res = await firstValueFrom(this.meetingAction.getRaisedHands(meetingCode));
       this.raisedHandList.set(res.participants);
     } catch (e) {
       console.warn('[MeetingState] Could not fetch initial raised hands', e);
     }
   }
 
-  /**
-   * Handle commands received from /topic/meeting.{code}.commands
-   * ───────────────────────────────────────────────────────────────
-   * Only non-host participants need to react to MUTE_ALL and KICK.
-   */
   private _handleHostCommand(cmd: import('../models/meeting.types').HostCommandPayload): void {
     const myUserId = this.auth.getCurrentUser()?.id;
 
     switch (cmd.action) {
       case 'MUTE_ALL': {
-        // If I am NOT the host, mute my mic via LiveKit
         if (!this.isHost()) {
           this.isMuted.set(true);
           this.media.setMicEnabled(false);
@@ -515,7 +548,6 @@ export class MeetingStateService {
       }
 
       case 'KICK': {
-        // If targetId matches my userId, disconnect and redirect
         if (cmd.targetId && cmd.targetId === myUserId) {
           this.showToast('⚠️ You have been removed from the meeting', 'error');
           this.cleanupMedia().then(() => {
@@ -527,7 +559,6 @@ export class MeetingStateService {
       }
 
       case 'SETTING_CHANGED': {
-        // For info only — host panel already updated optimistically
         console.log('[HostCmd] Setting changed:', cmd.type, cmd.enabled);
         break;
       }
@@ -537,35 +568,35 @@ export class MeetingStateService {
   // ── Controls — Optimistic update + SDK call + rollback on error ───────────
 
   /**
-   * Mic toggle:
-   * 1. Flip isMuted signal immediately → icon changes at once
-   * 2. Tell LiveKit SDK the new state
-   * 3. If SDK throws, rollback the signal
+   * Mic toggle: optimistic + SDK call + rollback.
    */
   async toggleMic(): Promise<void> {
     const wasМuted = this.isMuted();
-    const nextEnabled = wasМuted; // if was muted, next = enable mic
+    const nextEnabled = wasМuted;
     this.isMuted.set(!nextEnabled); // optimistic
     try {
       await this.media.setMicEnabled(nextEnabled);
       this.showToast(nextEnabled ? 'Microphone unmuted' : 'Microphone muted', 'info');
     } catch {
-      this.isMuted.set(wasМuted); // rollback
+      this.isMuted.set(wasМuted);
       this.showToast('Could not toggle microphone', 'error');
     }
   }
 
   /**
    * Camera toggle:
-   * 1. Flip isCameraOn signal immediately → avatar/video switches at once
-   * 2. Clear localStream if turning off → avatar shows without waiting for event
-   * 3. Tell LiveKit SDK the new state
-   * 4. If SDK throws, rollback
+   * 1. Flip isCameraOn + isCameraToggling signals immediately
+   * 2. Clear localStream if turning off → avatar appears INSTANTLY
+   * 3. Tell LiveKit SDK the new state (MediaStreamService pre-clears stream too)
+   * 4. Release isCameraToggling when done
    */
   async toggleCamera(): Promise<void> {
+    if (this.isCameraToggling()) return; // Prevent double-click race
     const wasOn = this.isCameraOn();
     const nextOn = !wasOn;
-    this.isCameraOn.set(nextOn); // optimistic
+
+    this.isCameraOn.set(nextOn);      // optimistic
+    this.isCameraToggling.set(true);  // disable button
 
     if (!nextOn) {
       // Camera going off: clear stream NOW so avatar appears immediately
@@ -583,6 +614,8 @@ export class MeetingStateService {
         // localStream will update via localStream$ subscription
       }
       this.showToast('No camera found or permission denied', 'error');
+    } finally {
+      this.isCameraToggling.set(false);
     }
   }
 
@@ -598,25 +631,19 @@ export class MeetingStateService {
   }
 
   /**
-   * Raise/Lower Hand:
-   * 1. Optimistic toggle of isHandRaised signal for instant UI
-   * 2. Call REST API POST raise-hand
-   * 3. Rollback on error
+   * Raise/Lower Hand: optimistic toggle + REST API + rollback.
    */
   toggleHand(): void {
     const wasRaised = this.isHandRaised();
     const nextRaising = !wasRaised;
-    this.isHandRaised.set(nextRaising); // optimistic
+    this.isHandRaised.set(nextRaising);
 
     this.meetingAction.toggleRaiseHand(this.meetingCode(), nextRaising).subscribe({
       next: () => {
-        this.showToast(
-          nextRaising ? '✋ Hand raised' : 'Hand lowered',
-          'info'
-        );
+        this.showToast(nextRaising ? '✋ Hand raised' : 'Hand lowered', 'info');
       },
       error: () => {
-        this.isHandRaised.set(wasRaised); // rollback
+        this.isHandRaised.set(wasRaised);
         this.showToast('Could not toggle hand raise', 'error');
       },
     });
@@ -626,7 +653,17 @@ export class MeetingStateService {
 
   sendReaction(emoji: string): void {
     this.showReactions.set(false);
-    this.media.sendReaction(emoji);
+    const user = this.auth.getCurrentUser();
+    if (user) {
+      this.signaling.sendMessage({
+        category: 'ACTION',
+        type: 'REACTION',
+        senderId: user.id,
+        meetingCode: this.meetingCode(),
+        payload: { emoji },
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 
   // ── Chat ─────────────────────────────────────────────────────────────────
@@ -694,40 +731,27 @@ export class MeetingStateService {
 
   vote(pollId: string, optionId: string): void {
     const code = this.meetingCode();
-    // Optimistic: cập nhật voteCount và votedByMe ngay lập tức
     this.polls.update(prev =>
       prev.map(p => {
         if (p.id !== pollId) return p;
-        
         let deltaTotal = 0;
         const newOptions = p.options.map(o => {
           let change = 0;
-          if (o.id === optionId && !o.votedByMe) {
-             change = 1; // Chọn option mới
-          } else if (o.id !== optionId && o.votedByMe) {
-             change = -1; // Bỏ chọn option cũ
-          }
-          if (change > 0 && !p.hasVoted) deltaTotal = 1; // Nếu vote lần đầu, tổng tăng 1. Nếu đổi vote, tổng ko đổi.
+          if (o.id === optionId && !o.votedByMe) change = 1;
+          else if (o.id !== optionId && o.votedByMe) change = -1;
+          if (change > 0 && !p.hasVoted) deltaTotal = 1;
           return {
             ...o,
             votedByMe: o.id === optionId,
             voteCount: Math.max(0, (o.voteCount || 0) + change),
           };
         });
-
-        return {
-          ...p,
-          hasVoted: true,
-          totalVotes: Math.max(0, (p.totalVotes || 0) + deltaTotal),
-          options: newOptions,
-        };
+        return { ...p, hasVoted: true, totalVotes: Math.max(0, (p.totalVotes || 0) + deltaTotal), options: newOptions };
       })
     );
     this.pollService.submitVote(code, pollId, optionId).subscribe({
       next: () => this.showToast('🗳️ Đã ghi nhận phiếu bầu!', 'success'),
-      error: () => {
-        this.showToast('Không thể gửi phiếu bầu', 'error');
-      },
+      error: () => this.showToast('Không thể gửi phiếu bầu', 'error'),
     });
   }
 
@@ -741,8 +765,6 @@ export class MeetingStateService {
           observer.complete();
         },
         error: (err: any) => {
-          // ARM suppress flag: nếu backend đã broadcast STOMP trước khi trả HTTP error,
-          // STOMP handler sẽ bỏ qua event đó — poll sẽ không hiển thị trên UI
           this._suppressNextPollCreated = true;
           if (this._suppressTimer) clearTimeout(this._suppressTimer);
           this._suppressTimer = setTimeout(() => {

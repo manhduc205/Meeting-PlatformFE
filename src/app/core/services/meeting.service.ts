@@ -5,12 +5,14 @@ import { environment } from '../../../environments/environment';
 
 export interface ParticipantDto {
   id: string;
-  email: string;
+  email?: string;
   firstName: string;
-  lastName: string;
+  lastName?: string;
   fullName: string;
   avatarUrl: string | null;
   status: 'HOST' | 'RAISING_HAND' | 'ACTIVE' | string;
+  isMe?: boolean;     // true nếu đây là người dùng hiện tại (từ /sidebar API)
+  joinedAt?: string;  // ISO timestamp (từ /sidebar API)
 }
 
 export interface JoinMeetingRequest {
@@ -98,9 +100,9 @@ export class MeetingService {
 
   // ── Waiting Room (Host only) ───────────────────────────────────────────────
 
-  /** GET /api/v1/meetings/{meetingCode}/host/waiting-room */
-  getWaitingRoom(meetingCode: string): Observable<WaitingParticipantDto[]> {
-    return this.http.get<WaitingParticipantDto[]>(`${this.apiUrl}/${meetingCode}/host/waiting-room`);
+  /** GET /api/v1/meetings/{meetingCode}/host/waiting-room — returns ParticipantDto[] */
+  getWaitingRoom(meetingCode: string): Observable<ParticipantDto[]> {
+    return this.http.get<ParticipantDto[]>(`${this.apiUrl}/${meetingCode}/host/waiting-room`);
   }
 
   /** POST /api/v1/meetings/{meetingCode}/host/waiting-room/action */
