@@ -19,6 +19,7 @@ import { HttpClient } from '@angular/common/http';
 import Keycloak from 'keycloak-js';
 import { firstValueFrom } from 'rxjs';
 import { Participant } from '../models/meeting.model';
+import { environment } from '../../../../environments/environment';
 
 interface MediaJoinResponse {
   mode: 'P2P' | 'SFU';
@@ -534,7 +535,7 @@ export class MediaStreamService {
   private async _fetchJoinInfo(code: string): Promise<MediaJoinResponse> {
     return firstValueFrom(
       this.http.get<MediaJoinResponse>(
-        `http://localhost:8081/api/v1/media/join/${code}`
+        `${environment.backendApiUrl}/api/v1/media/join/${code}`
       )
     );
   }

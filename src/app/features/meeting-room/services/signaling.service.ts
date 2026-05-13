@@ -8,6 +8,7 @@ import { PollService } from './poll.service';
 import { HostCommandPayload } from '../models/meeting.types';
 import { RaisedHandSocketPayload } from '../models/meeting.types';
 import { PollSocketPayload } from '../models/meeting.types';
+import { environment } from '../../../../environments/environment';
 
 export interface HostKnockNotification {
   type: 'NEW_KNOCK' | 'PARTICIPANT_APPROVED' | 'PARTICIPANT_REJECTED';
@@ -57,15 +58,15 @@ export class SignalingService {
     let currentToken = await this.authService.getToken();
 
     this.client = new Client({
-      brokerURL: 'ws://localhost:8081/ws/meeting/websocket',
+      brokerURL: `${environment.backendApiUrl.replace('http', 'ws')}/ws/meeting/websocket`,
       connectHeaders: {
         Authorization: `Bearer ${currentToken}`
       },
       webSocketFactory: () => {
         // SockJS fallback
         const SockJS = (window as any).SockJS;
-        if (SockJS) return new SockJS(`http://localhost:8081/ws/meeting?access_token=${currentToken}`);
-        return new WebSocket(`ws://localhost:8081/ws/meeting/websocket?access_token=${currentToken}`);
+        if (SockJS) return new SockJS(`${environment.backendApiUrl}/ws/meeting?access_token=${currentToken}`);
+        return new WebSocket(`${environment.backendApiUrl.replace('http', 'ws')}/ws/meeting/websocket?access_token=${currentToken}`);
       },
       // Exponential backoff: 1s → 2s → 4s → … up to 30 s
       reconnectDelay: 1000,

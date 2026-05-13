@@ -7,6 +7,7 @@ import { SignalingService } from '../meeting-room/services/signaling.service';
 import { MeetingService } from '../../core/services/meeting.service';
 import { Subscription } from 'rxjs';
 import { Client, IMessage } from '@stomp/stompjs';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-waiting-room',
@@ -179,8 +180,8 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
       this.stompClient = new Client({
         webSocketFactory: () => {
           const SockJS = (window as any).SockJS;
-          if (SockJS) return new SockJS(`http://localhost:8081/ws/meeting?access_token=${token}`);
-          return new WebSocket(`ws://localhost:8081/ws/meeting/websocket?access_token=${token}`);
+          if (SockJS) return new SockJS(`${environment.backendApiUrl}/ws/meeting?access_token=${token}`);
+          return new WebSocket(`${environment.backendApiUrl.replace('http', 'ws')}/ws/meeting/websocket?access_token=${token}`);
         },
         connectHeaders: { Authorization: `Bearer ${token}` },
         reconnectDelay: 2000,
