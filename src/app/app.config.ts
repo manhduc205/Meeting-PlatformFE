@@ -29,7 +29,7 @@ export const appConfig: ApplicationConfig = {
       },
       initOptions: {
         onLoad: 'check-sso',
-        silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
+        // silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html',
         // 3. Tối ưu thuật toán: Thêm cái này để tránh lỗi iframe trên localhost
         checkLoginIframe: false
       }
