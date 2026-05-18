@@ -31,9 +31,36 @@ import { MeetingStateService } from '../../services/meeting-state.service';
 
         <div class="tb-divider"></div>
 
-        <div class="tb-timer">
-          <span class="timer-dot"></span>
-          <span class="timer-text">{{ elapsed }}</span>
+
+        <!-- Recording indicator -->
+        <div class="tb-rec-wrapper"
+             *ngIf="ms.isRecording()"
+             (mouseenter)="showRecPopover = true"
+             (mouseleave)="startHidePopover()">
+          <button class="tb-rec-badge" (click)="showRecPopover = !showRecPopover">
+            <span class="tb-rec-dot"></span>
+            <span class="tb-rec-label">REC</span>
+            <span class="tb-rec-time">{{ formatDuration(ms.recordingDuration()) }}</span>
+          </button>
+
+          <!-- Hover popover -->
+          <div class="tb-rec-popover" *ngIf="showRecPopover"
+               (mouseenter)="cancelHidePopover()"
+               (mouseleave)="startHidePopover()">
+            <div class="tb-rec-popover-header">
+              <span class="tb-rec-popover-dot"></span>
+              <span class="tb-rec-popover-title">Recording</span>
+            </div>
+            <p class="tb-rec-popover-time">{{ formatDuration(ms.recordingDuration()) }}</p>
+            <div class="tb-rec-popover-actions">
+              <button class="tb-rec-stop-btn" (click)="stopRecording()">
+                <div class="tb-rec-stop-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                </div>
+                <span>Stop Recording</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -138,6 +165,8 @@ export class TopBarComponent {
   elapsed = '00:42:17';
   ms = inject(MeetingStateService);
   showLayoutMenu = false;
+  showRecPopover = false;
+  private _hidePopoverTimer: ReturnType<typeof setTimeout> | null = null;
 
   toggleLayoutMenu() {
     this.showLayoutMenu = !this.showLayoutMenu;
@@ -151,5 +180,31 @@ export class TopBarComponent {
   copyCode() {
     navigator.clipboard.writeText(this.meetingCode).catch(() => {});
     this.ms.showToast('Meeting ID copied!', 'success');
+  }
+
+  // ── Recording controls ────────────────────────────────────────────────────
+
+  stopRecording() {
+    this.ms.stopRecording();
+    this.showRecPopover = false;
+  }
+
+  startHidePopover() {
+    this._hidePopoverTimer = setTimeout(() => this.showRecPopover = false, 300);
+  }
+
+  cancelHidePopover() {
+    if (this._hidePopoverTimer) {
+      clearTimeout(this._hidePopoverTimer);
+      this._hidePopoverTimer = null;
+    }
+  }
+
+  formatDuration(seconds: number): string {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 }

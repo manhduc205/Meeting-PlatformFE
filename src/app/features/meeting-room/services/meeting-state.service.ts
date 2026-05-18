@@ -11,6 +11,7 @@ import { MeetingActionService } from './meeting-action.service';
 import { PollService } from './poll.service';
 import { PollCreateRequest } from '../models/meeting.types';
 import { firstValueFrom } from 'rxjs';
+import { RecordingService } from './recording.service';
 
 import { MeetingService, ParticipantDto } from '../../../core/services/meeting.service';
 
@@ -33,6 +34,7 @@ export class MeetingStateService {
   private meetingAction = inject(MeetingActionService);
   private pollService = inject(PollService);
   private meetingService = inject(MeetingService);
+  private recordingService = inject(RecordingService);
 
   // ── Core meeting info ────────────────────────────────────────────────────
   meetingCode = signal('');
@@ -80,6 +82,12 @@ export class MeetingStateService {
   hasLeft = signal(false);
   toastMessage = signal<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
   localStream = signal<MediaStream | null>(null);
+
+  // ── Recording state ──────────────────────────────────────────────────────
+  isRecording = signal(false);
+  currentEgressId = signal<string | null>(null);
+  recordingDuration = signal(0);   // seconds elapsed
+  private _recordingTimer: ReturnType<typeof setInterval> | null = null;
 
   // ── Waiting Room state (Host) ───────────────────────────────────────────────
   waitingParticipants = signal<ParticipantDto[]>([]);
@@ -467,6 +475,67 @@ export class MeetingStateService {
     this.isHandRaised.set(false);
     this.isLocalSpeaking.set(false);
     this.connectionState.set('idle');
+    this._stopRecordingTimer();
+  }
+
+  // ── Recording actions ─────────────────────────────────────────────────────
+
+  startRecording(): void {
+    const code = this.meetingCode();
+    this.recordingService.startRecording(code).subscribe({
+      next: (res) => {
+        this.isRecording.set(true);
+        this.currentEgressId.set(res.egressId);
+        this.recordingDuration.set(0);
+        this._startRecordingTimer();
+        this.showToast('⏺ Recording started — saving to cloud', 'success');
+      },
+      error: () => {
+        this.showToast('Failed to start recording', 'error');
+      },
+    });
+  }
+
+  stopRecording(): void {
+    const code = this.meetingCode();
+    const egressId = this.currentEgressId();
+    if (!egressId) return;
+    this.recordingService.stopRecording(code, egressId).subscribe({
+      next: () => {
+        const saved = this._formatDuration(this.recordingDuration());
+        this.isRecording.set(false);
+        this.currentEgressId.set(null);
+        this._stopRecordingTimer();
+        this.recordingDuration.set(0);
+        this.showToast(`Recording saved to cloud (${saved})`, 'info');
+      },
+      error: (err) => {
+        console.error('Stop recording error:', err);
+        this.showToast('Failed to stop recording', 'error');
+      },
+    });
+  }
+
+  private _startRecordingTimer(): void {
+    this._stopRecordingTimer();
+    this._recordingTimer = setInterval(() => {
+      this.recordingDuration.update(d => d + 1);
+    }, 1000);
+  }
+
+  private _stopRecordingTimer(): void {
+    if (this._recordingTimer) {
+      clearInterval(this._recordingTimer);
+      this._recordingTimer = null;
+    }
+  }
+
+  private _formatDuration(seconds: number): string {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 
   // ── Waiting Room Actions (Host) ─────────────────────────────────────────────

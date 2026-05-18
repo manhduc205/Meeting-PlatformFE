@@ -98,6 +98,38 @@ type Section = 'main' | 'spotlight' | 'remove' | 'poll';
         </button>
 
         <!-- Participants section -->
+        <p class="htp-section-title mt-1">Recording</p>
+
+        <!-- Not recording: Start button -->
+        <button *ngIf="!ms.isRecording()" class="htp-rec-start-btn" (click)="startRecording()" [disabled]="recLoading()">
+          <div class="htp-rec-start-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><circle cx="12" cy="12" r="8"/></svg>
+          </div>
+          <div class="htp-rec-start-text">
+            <p class="htp-rec-start-label">Start Recording</p>
+            <div class="htp-rec-start-sub">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="9" height="9"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.61 3h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.72-.72a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21.73 17z"/></svg>
+              <span>Saves to cloud automatically</span>
+            </div>
+          </div>
+        </button>
+
+        <!-- Recording in progress -->
+        <div *ngIf="ms.isRecording()" class="htp-rec-active">
+          <div class="htp-rec-active-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="8" width="13" height="8" rx="2" ry="2"/></svg>
+          </div>
+          <div class="htp-rec-active-text">
+            <p class="htp-rec-active-label">Recording in progress</p>
+            <div class="htp-rec-active-sub">
+              <span class="htp-rec-dot"></span>
+              <span>{{ formatDuration(ms.recordingDuration()) }} · use TopBar to stop</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Participants section -->
+
         <p class="htp-section-title mt-1">Participants</p>
 
         <button class="htp-nav-btn" (click)="section.set('spotlight')">
@@ -313,6 +345,7 @@ export class HostToolsPanelComponent {
   shareDisabled = signal(false);
   waitingRoom = signal(false);
   loading = signal(false);
+  recLoading = signal(false);
   section = signal<Section>('main');
   spotlightId = signal<string | null>(null);
 
@@ -440,6 +473,22 @@ export class HostToolsPanelComponent {
   }
 
   endMeeting() { this.ms.endCall(); }
+
+  // ── Recording ────────────────────────────────────────────────────────
+
+  startRecording(): void {
+    this.recLoading.set(true);
+    this.ms.startRecording();
+    // Optimistically close the loading state after a short delay
+    // (actual state is driven by ms.isRecording() signal)
+    setTimeout(() => this.recLoading.set(false), 3000);
+  }
+
+  formatDuration(seconds: number): string {
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
 
   // ── Poll helpers ──────────────────────────────────────────────────────────
 
