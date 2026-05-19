@@ -93,74 +93,172 @@
       </div>
     </div>
 
-    <!-- Reactions bar -->
-    <div class="rd-reactions">
-      <div class="rd-reaction-bar">
-        <button
-          *ngFor="let emoji of reactions"
-          class="rd-emoji-btn"
-          [title]="emoji"
-        >{{ emoji }}</button>
-        <div class="rd-reaction-divider"></div>
-        <button class="rd-comment-btn">
-          <span class="material-symbols-outlined">add_comment</span>
-          Comment
-        </button>
-      </div>
-    </div>
+
 
     <!-- Transcript -->
     <div class="rd-transcript">
-      <h3 class="rd-transcript-title">Transcript &amp; Notes</h3>
+      <!-- Copy toast -->
+      <div class="rd-copy-toast" [class.visible]="copyToastVisible()">✓ Copied!</div>
+
+      <div class="rd-transcript-header">
+        <h3 class="rd-transcript-title">Transcript &amp; Notes</h3>
+        <div class="rd-transcript-actions">
+          <button class="rd-transcript-action-btn" title="Copy all transcript" (click)="copyAllTranscript()">
+            <span class="material-symbols-outlined">content_copy</span>
+          </button>
+          <button class="rd-transcript-action-btn" title="Download">
+            <span class="material-symbols-outlined">download</span>
+          </button>
+          <button class="rd-transcript-action-btn" title="Translate">
+            <span class="material-symbols-outlined">translate</span>
+          </button>
+          <button class="rd-transcript-action-btn" title="More">
+            <span class="material-symbols-outlined">more_vert</span>
+          </button>
+        </div>
+      </div>
       <div class="rd-transcript-list">
         <div class="rd-transcript-row" *ngFor="let line of transcriptLines">
           <span class="rd-transcript-time">{{ line.time }}</span>
           <p class="rd-transcript-text">{{ line.text }}</p>
+          <div class="rd-transcript-row-actions">
+            <button class="rd-transcript-row-btn" title="Copy this line" (click)="copyLine(line.text)">
+              <span class="material-symbols-outlined">content_copy</span>
+            </button>
+            <button class="rd-transcript-row-btn" title="Translate">
+              <span class="material-symbols-outlined">translate</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
   </div>
 
-  <!-- Right sidebar: calendar -->
+  <!-- Right sidebar: Summary / AI Chat -->
   <aside class="rd-right-sidebar">
 
-    <!-- Calendar header -->
-    <div class="rd-cal-header">
-      <div class="rd-cal-nav">
-        <h2 class="rd-cal-title">Today, Mar 17</h2>
-        <div class="rd-cal-arrows">
-          <button class="rd-cal-arrow"><span class="material-symbols-outlined">chevron_left</span></button>
-          <button class="rd-cal-arrow"><span class="material-symbols-outlined">chevron_right</span></button>
+    <!-- Tabs -->
+    <div class="rd-sidebar-tabs">
+      <button
+        class="rd-sidebar-tab"
+        [class.active]="activeTab() === 'summary'"
+        (click)="setTab('summary')"
+      >
+        <span class="material-symbols-outlined">checklist_rtl</span>
+        Summary
+      </button>
+      <button
+        class="rd-sidebar-tab"
+        [class.active]="activeTab() === 'aichat'"
+        (click)="setTab('aichat')"
+      >
+        <span class="material-symbols-outlined">smart_toy</span>
+        AI Chat
+      </button>
+    </div>
+
+    <!-- Summary Panel -->
+    <div class="rd-sidebar-panel" *ngIf="activeTab() === 'summary'">
+      <!-- Action Bar -->
+      <div class="rd-summary-actionbar">
+        <button class="rd-summarize-btn">
+          Summarize
+          <span class="material-symbols-outlined">arrow_drop_down</span>
+        </button>
+        <div class="rd-summary-icons">
+          <button class="rd-summary-icon-btn" title="Translate">
+            <span class="material-symbols-outlined">translate</span>
+          </button>
+          <button class="rd-summary-icon-btn" title="Settings">
+            <span class="material-symbols-outlined">settings</span>
+          </button>
         </div>
       </div>
 
-      <!-- Mini calendar -->
-      <div class="rd-cal-grid">
-        <span class="rd-cal-dow" *ngFor="let d of weekDays">{{ d }}</span>
-        <button
-          *ngFor="let day of calendarDays"
-          class="rd-cal-day"
-          [class.today]="day.type === 'today'"
-          [class.prev]="day.type === 'prev'"
-        >{{ day.num }}</button>
+      <!-- Summary Content -->
+      <div class="rd-summary-content">
+        <section class="rd-summary-section">
+          <h3 class="rd-summary-section-title">
+            <span class="rd-section-bar"></span>
+            Summary of Video Content
+          </h3>
+          <p class="rd-summary-text">
+            This clip demonstrates the core functionalities of the VideoConnect
+            Enterprise dashboard, focusing on navigation, meeting recording, and
+            clip management. It highlights the streamlined user interface
+            designed for enterprise-level communication efficiency.
+          </p>
+        </section>
+
+        <section class="rd-summary-section">
+          <h3 class="rd-summary-section-title">
+            <span class="rd-section-bar"></span>
+            Timeline of Key Events
+          </h3>
+          <div class="rd-timeline-table-wrap">
+            <table class="rd-timeline-table">
+              <thead>
+                <tr>
+                  <th>Time Stamp</th>
+                  <th>Event/Topic</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let event of timelineEvents">
+                  <td class="rd-tl-time">{{ event.time }}</td>
+                  <td class="rd-tl-event">{{ event.event }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
 
-    <!-- Empty state -->
-    <div class="rd-no-meetings">
-      <div class="rd-clock-icon">
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="2"/>
-          <path d="M50 30V50L65 60" stroke="currentColor" stroke-linecap="round" stroke-width="2"/>
-        </svg>
+    <!-- AI Chat Panel -->
+    <div class="rd-sidebar-panel rd-aichat-panel" *ngIf="activeTab() === 'aichat'">
+      <!-- Welcome / Suggestions -->
+      <div class="rd-aichat-welcome" *ngIf="chatMessages().length === 0">
+        <div class="rd-aichat-greeting">👋 Hi~ Feel free to ask me anything!</div>
+        <div class="rd-aichat-suggestions">
+          <button
+            class="rd-aichat-suggestion"
+            *ngFor="let s of chatSuggestions"
+            (click)="sendSuggestion(s)"
+          >{{ s }}</button>
+        </div>
       </div>
-      <h4 class="rd-no-meetings-title">No meetings scheduled</h4>
-      <p class="rd-no-meetings-sub">You're all caught up! Enjoy your free time or schedule a new meeting.</p>
-      <button class="rd-schedule-btn">
-        <span class="material-symbols-outlined">add</span>
-        Schedule meeting
-      </button>
+
+      <!-- Chat messages -->
+      <div class="rd-aichat-messages" *ngIf="chatMessages().length > 0">
+        <div
+          class="rd-aichat-message"
+          *ngFor="let msg of chatMessages()"
+          [class.user]="msg.role === 'user'"
+          [class.ai]="msg.role === 'ai'"
+        >{{ msg.text }}</div>
+      </div>
+
+      <!-- Input area -->
+      <div class="rd-aichat-inputarea">
+        <textarea
+          class="rd-aichat-input"
+          placeholder="Feel free to ask me anything..."
+          [(ngModel)]="chatInput"
+          (keydown.enter)="sendChat($event)"
+          rows="2"
+        ></textarea>
+        <div class="rd-aichat-inputbar">
+          <button class="rd-aichat-model-btn">
+            <span class="material-symbols-outlined">auto_awesome</span>
+            Premium Models
+          </button>
+          <button class="rd-aichat-send-btn" (click)="sendChat(null)" [disabled]="!chatInput.trim()">
+            <span class="material-symbols-outlined">arrow_upward</span>
+          </button>
+        </div>
+      </div>
     </div>
 
   </aside>

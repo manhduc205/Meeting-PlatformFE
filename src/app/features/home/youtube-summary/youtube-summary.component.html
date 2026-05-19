@@ -1,0 +1,122 @@
+<div class="yt-summary-container">
+  <div class="yt-summary-content">
+    <!-- Header -->
+    <div class="yt-header">
+      <h1>Free YouTube Video Summarizer</h1>
+      <p>
+        Batch summarize YouTube videos and playlists in seconds, generating comprehensive and in-depth summaries.
+      </p>
+    </div>
+    
+    <!-- Main Tool Card -->
+    <div class="yt-card">
+      <!-- Main Tabs -->
+      <div class="yt-tabs">
+        <button class="yt-tab active">
+          <iconify-icon icon="hugeicons:youtube"></iconify-icon>
+          YouTube
+        </button>
+        <button class="yt-tab">
+          <iconify-icon icon="hugeicons:video-01"></iconify-icon>
+          Video
+        </button>
+        <button class="yt-tab">
+          <iconify-icon icon="hugeicons:voice"></iconify-icon>
+          Audio
+        </button>
+        <button class="yt-tab">
+          <iconify-icon icon="hugeicons:document-attachment"></iconify-icon>
+          PDF
+        </button>
+        <button class="yt-tab">
+          <iconify-icon icon="hugeicons:file-link"></iconify-icon>
+          Webpage
+        </button>
+        <button class="yt-tab">
+          <iconify-icon icon="hugeicons:text-square"></iconify-icon>
+          Long Text
+        </button>
+      </div>
+      
+      <div class="yt-card-body">
+        <!-- Sub Tabs -->
+        <div class="yt-sub-tabs">
+          <button class="yt-sub-tab active">YouTube Video</button>
+          <button class="yt-sub-tab">YouTube Playlist</button>
+        </div>
+        
+        <!-- Input Area -->
+        <div class="yt-input-group">
+          <span class="material-symbols-outlined input-icon">link</span>
+          <input type="url" placeholder="Paste YouTube link here..." />
+        </div>
+        
+        <!-- Action Button -->
+        <div class="yt-action">
+          <button class="btn-generate" (click)="generateSummary()">
+            <span class="material-symbols-outlined">auto_awesome</span>
+            Generate Summary
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Examples Section -->
+    <div class="yt-examples">
+      <h2>
+        <span class="material-symbols-outlined icon-lightbulb">lightbulb</span>
+        Examples
+      </h2>
+      
+      <div class="examples-grid">
+        <!-- Example 1 -->
+        <a class="example-card" (click)="generateSummary()">
+          <div class="example-thumb">
+            <img alt="Harvard Lecture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1R3x4q60zO77UnlFq72bTXVqZ96VUtBOCXhU-BZVtjDnZDv9BQin5186FmGDGwGp0Rf_o2NfmXK9bR-QDiiWnI5b9kCPBirp4xX2s6XVxqohA8Nj_czLzS9it-1Qe7vUXCaDXscMNe2jPSaPqLUpCbZyCbsZvWxpdZ1JJNG7tRjSPqmmh_O-4HYpXqgbOYelvWDI7z59ZSNsDM1PEmP7oQxsZ2eTwjQyuet0OXHv8LXw6KH_HAZmtU_5WPv0yQwOVwnqQayycSW8"/>
+            <div class="duration">45:20</div>
+          </div>
+          <div class="example-info">
+            <h3>CS50 2023 - Lecture 0 - Scratch</h3>
+            <p>Harvard University</p>
+          </div>
+        </a>
+        
+        <!-- Example 2 -->
+        <a class="example-card" (click)="generateSummary()">
+          <div class="example-thumb">
+            <img alt="TED Talk" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXXHc0arKzEO0MDA_qWj36HyB6m_JqekvkQvBykTjntvAZGqH1eDLy-Ui5Fcbx0SRAOoHc5iHhDQsI_v_JOHngr8gyVZlPcH4XksTKUVTAXfLZamxNMEQiziHlLEjySDiTzG5Q4OBAgouwVqBoirj6Hu0w30qwphG8jjP4Eo3NraWqmzmzYUn8oKDPS36LGzYpl51pqbjEoSoT3P1m1S4fFgDnk2N68PByZYD0ObI2B0R7GRngxK_kQoApmS2BKkwnMSmQN_afiK4"/>
+            <div class="duration">18:05</div>
+          </div>
+          <div class="example-info">
+            <h3>Inside the mind of a master procrastinator</h3>
+            <p>TED</p>
+          </div>
+        </a>
+        
+        <!-- Example 3 -->
+        <a class="example-card" (click)="generateSummary()">
+          <div class="example-thumb">
+            <img alt="Tech Review" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqWvmDTOxTnPejqlhnYHB-bzl28-YRZjHonQ-EK2yym3TxeuA57_7PdvBFcVIDGYVfh03p-Rh_KRywIH8E1kOLyvEVjk23tdV-YQP0uRORYVQ_vcW45V8OF5y4t90EZb-IXg5oX2G7qwwT87Fw47uZ2bpXqoJDOjqyrIBdGllKz9Ax4ZgusVofCjDty-c2rbmpdQ8KV2Ftrwb0DQ-3B8ldyFaFiv7mLU4O9c0TMYKXAxOvoKS_x5YdpFnU-cHYzCeStcRcT_X9VeE"/>
+            <div class="duration">12:34</div>
+          </div>
+          <div class="example-info">
+            <h3>M3 MacBook Pro Review: The Sweet Spot!</h3>
+            <p>Tech Channel</p>
+          </div>
+        </a>
+        
+        <!-- Example 4 -->
+        <a class="example-card" (click)="generateSummary()">
+          <div class="example-thumb">
+            <img alt="AI News" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbRIUEtYFVSoW_CqHxiLpt-bgaLFgECsuK4UjAnNWFxXaRReUcezorVzpnCMxLz7xzSF1Z3Na6BT2x8-jtTNsdnPVhDj4K7li52nbSE9nfycp1pAGqGoWb_jODKYOq7Eetlh_NDoZqPF_i_mdtAFM0CIwMpH8shasgyKJIMrC6di4Uo5sjpGNBiCDwwbumydxtNMjDd6HgkuyiIseFe0Z9iFzMcB6sbUU2ag9qB8wbbFwFUFbHjTSIgyFaE8CqV_qdoHVqYDKtoLQ"/>
+            <div class="duration">24:10</div>
+          </div>
+          <div class="example-info">
+            <h3>The Future of AI: What to expect in 2024</h3>
+            <p>Tech Insight</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

@@ -74,6 +74,12 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "allowedHosts": [
+              "meeting.videoconnect.click"
+            ],
+            "port": 4200
+          },
           "configurations": {
             "production": {
               "buildTarget": "meetingplatform-fe:build:production"

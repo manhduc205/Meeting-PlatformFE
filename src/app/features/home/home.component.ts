@@ -42,7 +42,7 @@ export class HomeComponent {
     { icon: 'home', label: 'Home', route: '/', active: true },
     { icon: 'video_camera_front', label: 'Meetings', route: null, active: false },
     { icon: 'record_voice_over', label: 'Recordings', route: '/recordings', active: false },
-    { icon: 'contacts', label: 'Contacts', route: null, active: false },
+    { icon: 'smart_display', label: 'Youtube Summary', route: '/youtube-summary', active: false },
   ];
 
   actionButtons = [

@@ -14,7 +14,8 @@ export const routes: Routes = [
     children: [
       { path: '', loadComponent: () => import('./features/home/dashboard/dashboard.component').then(m => m.DashboardComponent) },
       { path: 'recordings', loadComponent: () => import('./features/home/recording-video/recordings.component').then(m => m.RecordingsComponent) },
-      { path: 'recordings/:id', loadComponent: () => import('./features/home/recording-video/recording-detail.component').then(m => m.RecordingDetailComponent) }
+      { path: 'recordings/:id', loadComponent: () => import('./features/home/recording-video/recording-detail.component').then(m => m.RecordingDetailComponent) },
+      { path: 'youtube-summary', loadComponent: () => import('./features/home/youtube-summary/youtube-summary.component').then(m => m.YoutubeSummaryComponent) }
     ]
   },
   {
