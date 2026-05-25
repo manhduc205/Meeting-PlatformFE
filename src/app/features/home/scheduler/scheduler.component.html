@@ -1,0 +1,372 @@
+<div class="scheduler-wrapper">
+
+  <!-- ═══════════════════════════════════════════
+       TOOLBAR
+  ════════════════════════════════════════════ -->
+  <div class="scheduler-toolbar">
+    <div class="toolbar-left">
+      <button class="today-btn" (click)="goToToday()">Today</button>
+      <div class="nav-arrows">
+        <button class="nav-arrow-btn" (click)="prev()">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <button class="nav-arrow-btn" (click)="next()">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+
+      <!-- Week label + calendar icon picker trigger -->
+      <div class="week-label-wrap">
+        <h2 class="week-label">{{ weekLabel }}</h2>
+        <button
+          class="calendar-picker-anchor cal-icon-btn"
+          (click)="toggleCalendarPicker($event)"
+          title="Open date picker">
+          <span class="material-symbols-outlined">calendar_today</span>
+        </button>
+
+        <!-- Mini Calendar Popup -->
+        <div class="mini-calendar-popup" *ngIf="showCalendarPicker()" (click)="$event.stopPropagation()">
+          <!-- Picker header -->
+          <div class="picker-header">
+            <button class="picker-nav" (click)="prevPickerYear()" title="Previous year">
+              <span class="material-symbols-outlined">keyboard_double_arrow_left</span>
+            </button>
+            <button class="picker-nav" (click)="prevPickerMonth()" title="Previous month">
+              <span class="material-symbols-outlined">chevron_left</span>
+            </button>
+            <span class="picker-month-label">{{ pickerMonthLabel }}</span>
+            <button class="picker-nav" (click)="nextPickerMonth()" title="Next month">
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+            <button class="picker-nav" (click)="nextPickerYear()" title="Next year">
+              <span class="material-symbols-outlined">keyboard_double_arrow_right</span>
+            </button>
+          </div>
+
+          <!-- Day labels -->
+          <div class="picker-day-labels">
+            <span *ngFor="let lbl of pickerDayLabels">{{ lbl }}</span>
+          </div>
+
+          <!-- Day cells -->
+          <div class="picker-grid">
+            <button
+              *ngFor="let cell of pickerCells"
+              class="picker-cell"
+              [class.empty]="cell === null"
+              [class.today]="isPickerToday(cell)"
+              [class.selected]="isPickerSelected(cell)"
+              [disabled]="cell === null"
+              (click)="selectPickerDate(cell, $event)">
+              {{ cell ? cell.getDate() : '' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar-right">
+      <div class="view-toggle">
+        <button class="view-btn" [class.active]="currentView() === 'day'"   (click)="currentView.set('day')">Day</button>
+        <button class="view-btn" [class.active]="currentView() === 'week'"  (click)="currentView.set('week')">Week</button>
+        <button class="view-btn" [class.active]="currentView() === 'month'" (click)="currentView.set('month')">Month</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       CALENDAR GRID (Day / Week)
+  ════════════════════════════════════════════ -->
+  <div class="calendar-container" *ngIf="currentView() !== 'month'">
+
+    <!-- Day header row -->
+    <div class="day-headers">
+      <div class="time-gutter-header">
+        <span class="gmt-label">GMT+07</span>
+      </div>
+      <div
+        class="day-col-header"
+        *ngFor="let day of weekDays"
+        [class.today-header]="isToday(day)"
+        [class.weekend-header]="isWeekend(day)">
+        <div class="day-name">{{ day.toLocaleString('en-US', { weekday: 'short' }).toUpperCase() }}</div>
+        <div class="day-number-wrap">
+          <span class="day-number" [class.today-badge]="isToday(day)">
+            {{ day.getDate() }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scrollable body -->
+    <div class="calendar-body">
+
+      <!-- Time gutter -->
+      <div class="time-gutter">
+        <div class="hour-label" *ngFor="let h of hours">
+          <span>{{ formatHour(h) }}</span>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="grid-columns">
+
+        <!-- Horizontal hour lines -->
+        <div class="bg-grid">
+          <div class="bg-hour-line" *ngFor="let h of hours"></div>
+        </div>
+
+        <!-- Vertical column backgrounds -->
+        <div class="bg-cols">
+          <div
+            class="bg-col"
+            *ngFor="let day of weekDays"
+            [class.today-col]="isToday(day)"
+            [class.weekend-col]="isWeekend(day)">
+          </div>
+        </div>
+
+        <!-- Events -->
+        <div class="events-layer">
+          <div class="day-events-col" *ngFor="let day of weekDays">
+
+            <!-- Current time indicator -->
+            <div *ngIf="isToday(day)" class="time-indicator" [style.top.px]="currentTimeTop">
+              <div class="time-dot"></div>
+              <div class="time-line"></div>
+            </div>
+
+            <!-- Meeting blocks -->
+            <div
+              *ngFor="let meeting of getMeetingsForDay(day)"
+              class="meeting-block"
+              [class.my-meeting]="meeting.isMyMeeting"
+              [class.other-meeting]="!meeting.isMyMeeting"
+              [style.top.px]="getMeetingTop(meeting)"
+              [style.height.px]="getMeetingHeight(meeting)"
+              (click)="openMeetingDetail(meeting, $event)">
+
+              <!-- Row 1: Title + calendar icon -->
+              <div class="mb-title-row">
+                <span class="mb-title">{{ meeting.title }}</span>
+                <span class="material-symbols-outlined mb-cal-icon">event</span>
+              </div>
+
+              <!-- Row 2: Time -->
+              <div class="mb-time">{{ formatMeetingTime(meeting) }}</div>
+
+              <!-- Row 2b: Description (only when block >= 2h = 88px) -->
+              <div class="mb-description"
+                   *ngIf="getMeetingHeight(meeting) >= 88 && meeting.description">
+                {{ meeting.description }}
+              </div>
+
+              <!-- Row 3: Avatar + name + check — always at bottom -->
+              <div class="mb-host-row">
+                <img
+                  *ngIf="meeting.hostAvatar"
+                  [src]="meeting.hostAvatar"
+                  [alt]="meeting.hostName || ''"
+                  class="mb-avatar" />
+                <div *ngIf="!meeting.hostAvatar"
+                     class="mb-avatar-placeholder"
+                     [attr.data-color]="meeting.id">
+                  {{ (meeting.hostName || 'U').charAt(0).toUpperCase() }}
+                </div>
+                <span class="mb-host-name">{{ meeting.isMyMeeting ? (user()?.name || 'You') : meeting.hostName }}</span>
+                <!-- Green outline + white background circle -->
+                <span class="mb-check-wrap">
+                  <span class="material-symbols-outlined mb-check">check_circle</span>
+                </span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /grid-columns -->
+    </div><!-- /calendar-body -->
+  </div><!-- /calendar-container -->
+
+  <!-- ═══════════════════════════════════════════
+       MONTH GRID
+  ════════════════════════════════════════════ -->
+  <div class="month-calendar-container" *ngIf="currentView() === 'month'">
+    <!-- Days Header -->
+    <div class="month-header-row">
+      <div class="month-header-cell">Mon</div>
+      <div class="month-header-cell">Tue</div>
+      <div class="month-header-cell">Wed</div>
+      <div class="month-header-cell">Thu</div>
+      <div class="month-header-cell">Fri</div>
+      <div class="month-header-cell">Sat</div>
+      <div class="month-header-cell">Sun</div>
+    </div>
+
+    <!-- Grid Cells -->
+    <div class="month-grid">
+      <div
+        class="month-cell"
+        *ngFor="let day of monthDays"
+        [class.not-current-month]="!isCurrentMonth(day)"
+        [class.today]="isToday(day)">
+        
+        <span class="month-cell-number">{{ day.getDate() }}</span>
+        
+        <div class="month-events">
+          <div
+            *ngFor="let m of getMeetingsForDay(day)"
+            class="month-event"
+            [class.my-meeting]="m.isMyMeeting"
+            [class.other-meeting]="!m.isMyMeeting"
+            (click)="openMeetingDetail(m, $event)">
+            
+            <div class="month-event-content">
+              <div class="month-event-time">{{ m.startTime | date:'shortTime' }}</div>
+              <div class="month-event-title" [title]="m.title">{{ m.title }}</div>
+            </div>
+            <span class="material-symbols-outlined month-event-icon">event</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item">
+      <span class="legend-dot my"></span>
+      <span class="legend-text">My meetings</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot other"></span>
+      <span class="legend-text">Invited meetings</span>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab-btn" (click)="isScheduleModalOpen.set(true)" title="New meeting">
+    <span class="material-symbols-outlined">add</span>
+  </button>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     MEETING DETAIL PANEL
+════════════════════════════════════════════════════ -->
+<div class="detail-overlay" *ngIf="selectedMeeting()" (click)="closeMeetingDetail()"></div>
+
+<div class="meeting-detail-panel" *ngIf="selectedMeeting()" (click)="$event.stopPropagation()">
+
+  <!-- Action bar -->
+  <div class="detail-action-bar">
+    <button class="detail-action-btn" title="Edit">
+      <span class="material-symbols-outlined">edit</span>
+    </button>
+    <button class="detail-action-btn" title="Delete">
+      <span class="material-symbols-outlined">delete</span>
+    </button>
+    <button class="detail-action-btn" title="More options">
+      <span class="material-symbols-outlined">more_horiz</span>
+    </button>
+    <div class="detail-divider"></div>
+    <button class="detail-action-btn" title="Expand">
+      <span class="material-symbols-outlined">open_in_full</span>
+    </button>
+    <button class="detail-action-btn detail-close-btn" title="Close" (click)="closeMeetingDetail()">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+  </div>
+
+  <!-- Title -->
+  <h2 class="detail-title">{{ selectedMeeting()!.title }}</h2>
+
+  <!-- Date/time row -->
+  <div class="detail-row">
+    <span class="material-symbols-outlined detail-row-icon">schedule</span>
+    <span class="detail-row-text">{{ formatMeetingDetailTime(selectedMeeting()!) }}</span>
+  </div>
+
+  <!-- Start + Chat buttons -->
+  <div class="detail-row detail-actions-row">
+    <span class="material-symbols-outlined detail-row-icon">videocam</span>
+    <div class="detail-btns">
+      <button class="detail-start-btn" (click)="startMeeting(selectedMeeting()!)">
+        <span class="material-symbols-outlined">play_arrow</span>
+        Start
+      </button>
+      <button class="detail-chat-btn">
+        <span class="material-symbols-outlined">chat_bubble</span>
+        Chat
+      </button>
+    </div>
+  </div>
+  <div class="detail-view-join-wrap">
+    <a class="detail-view-join" href="#">View join info</a>
+  </div>
+
+  <div class="detail-hr"></div>
+
+  <!-- Meeting URL -->
+  <div class="detail-row">
+    <span class="material-symbols-outlined detail-row-icon">location_on</span>
+    <a class="detail-meeting-url" [href]="selectedMeeting()!.meetingUrl" target="_blank">
+      {{ selectedMeeting()!.meetingUrl }}
+    </a>
+  </div>
+
+  <div class="detail-hr"></div>
+
+  <!-- Invitees -->
+  <div class="detail-row detail-row-top">
+    <span class="material-symbols-outlined detail-row-icon">group</span>
+    <div class="detail-invitees">
+      <p class="detail-invitees-label">Invitees</p>
+      <div class="detail-invitee" *ngFor="let p of selectedMeeting()!.participants">
+        <div class="invitee-avatar-wrap">
+          <img *ngIf="p.avatar" [src]="p.avatar" [alt]="p.name" class="invitee-avatar" />
+          <div *ngIf="!p.avatar" class="invitee-avatar-placeholder">{{ p.name.charAt(0) }}</div>
+          <span *ngIf="p.isHost" class="invitee-online-dot"></span>
+        </div>
+        <span class="invitee-name">{{ p.name }}{{ p.isHost ? ' (Host)' : '' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-hr"></div>
+
+  <!-- Add attachments -->
+  <div class="detail-row detail-row-link">
+    <span class="material-symbols-outlined detail-row-icon">attach_file</span>
+    <a class="detail-link" href="#">Add attachments</a>
+  </div>
+
+  <div class="detail-hr"></div>
+
+  <!-- Create agenda -->
+  <div class="detail-row detail-row-link">
+    <span class="material-symbols-outlined detail-row-icon">description</span>
+    <a class="detail-link" href="#">Create agenda</a>
+    <span class="badge-new">NEW</span>
+  </div>
+
+  <div class="detail-hr"></div>
+
+  <!-- Description -->
+  <div class="detail-row detail-row-top" *ngIf="selectedMeeting()!.description">
+    <span class="material-symbols-outlined detail-row-icon">menu</span>
+    <div class="detail-desc">
+      <p class="detail-desc-label">Description</p>
+      <p class="detail-desc-text">{{ selectedMeeting()!.description }}</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Schedule Modal -->
+<app-schedule-modal
+  *ngIf="isScheduleModalOpen()"
+  (close)="onMeetingCreated()">
+</app-schedule-modal>

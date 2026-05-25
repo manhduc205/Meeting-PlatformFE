@@ -43,6 +43,7 @@ export class HomeComponent {
     { icon: 'video_camera_front', label: 'Meetings', route: null, active: false },
     { icon: 'record_voice_over', label: 'Recordings', route: '/recordings', active: false },
     { icon: 'smart_display', label: 'Youtube Summary', route: '/youtube-summary', active: false },
+    { icon: 'calendar_month', label: 'Scheduler', route: '/scheduler', active: false },
   ];
 
   actionButtons = [

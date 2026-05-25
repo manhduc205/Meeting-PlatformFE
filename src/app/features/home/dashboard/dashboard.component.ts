@@ -23,8 +23,12 @@ export class DashboardComponent {
     { icon: 'present_to_all', label: 'Share Screen', color: 'primary', route: null },
   ];
   handleAction(btn: any) {
-    if (btn.label === 'Schedule' || btn.label === 'New Meeting') {
+    if (btn.label === 'New Meeting') {
       this.isScheduleModalOpen = true;
+      return;
+    }
+    if (btn.label === 'Schedule') {
+      this.router.navigate(['/scheduler']);
       return;
     }
     if (btn.label === 'Join') {
@@ -36,6 +40,10 @@ export class DashboardComponent {
         queryParams: { title: 'Weekly Sync: Product & Design' }
       });
     }
+  }
+
+  navigateToScheduler() {
+    this.router.navigate(['/scheduler']);
   }
 
   quickActions = [
