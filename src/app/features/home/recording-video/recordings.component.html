@@ -1,6 +1,6 @@
 <!-- We are inside the HomeComponent's page-content -->
 <div class="rv-layout">
-  
+
   <!-- SECONDARY SIDEBAR (sub-nav) -->
   <aside class="rv-subnav">
     <div class="rv-subnav-inner">
@@ -32,7 +32,7 @@
           <a href="#" class="rv-banner-link">VideoConnect Workplace Pro</a> for more advanced features.
         </p>
         <div class="rv-banner-right">
-          <span class="rv-banner-count">1 of 5 clips</span>
+          <span class="rv-banner-count">{{ recordings().length }} / 5 clips</span>
           <button class="rv-banner-close" (click)="bannerClosed.set(true)">
             <span class="material-symbols-outlined">close</span>
           </button>
@@ -44,7 +44,7 @@
         <h2 class="rv-section-title">My clips</h2>
         <div class="rv-section-actions">
           <a href="#" class="rv-feedback-link">Feedback</a>
-          <button class="rv-icon-btn">
+          <button class="rv-icon-btn" (click)="loadRecordings()" title="Refresh">
             <span class="material-symbols-outlined">refresh</span>
           </button>
         </div>
@@ -73,21 +73,31 @@
         <div class="rv-filter-left">
           <div class="rv-filter-search">
             <span class="material-symbols-outlined rv-filter-search-icon">search</span>
-            <input type="text" class="rv-filter-input" placeholder="Search by clip name" />
+            <input
+              type="text"
+              class="rv-filter-input"
+              placeholder="Tìm kiếm theo tên bản ghi..."
+              [value]="searchQuery()"
+              (input)="searchQuery.set($any($event.target).value)"
+            />
           </div>
           <select class="rv-select">
-            <option>Latest created</option>
-            <option>Oldest created</option>
+            <option>Mới nhất</option>
+            <option>Cũ nhất</option>
           </select>
           <select class="rv-select">
-            <option>Select a tag</option>
-            <option>Work</option>
-            <option>Personal</option>
+            <option value="">Tất cả trạng thái</option>
+            <option value="COMPLETED">Hoàn thành</option>
+            <option value="RECORDING">Đang ghi</option>
+            <option value="STARTING">Đang khởi động</option>
+            <option value="FAILED">Lỗi</option>
           </select>
           <select class="rv-select">
-            <option>All status</option>
-            <option>Processing</option>
-            <option>Ready</option>
+            <option value="">Tất cả quyền riêng tư</option>
+            <option value="PUBLIC">Công khai</option>
+            <option value="MEETING_MEMBERS">Thành viên họp</option>
+            <option value="LINK_ONLY">Qua liên kết</option>
+            <option value="PRIVATE">Riêng tư</option>
           </select>
         </div>
         <div class="rv-view-toggle">
@@ -108,47 +118,103 @@
         </div>
       </div>
 
+      <!-- Loading state -->
+      <div class="rv-loading-state" *ngIf="isLoading()">
+        <div class="rv-spinner"></div>
+        <span>Đang tải bản ghi...</span>
+      </div>
+
+      <!-- Error state -->
+      <div class="rv-error-state" *ngIf="errorMessage() && !isLoading()">
+        <span class="material-symbols-outlined">error_outline</span>
+        <span>{{ errorMessage() }}</span>
+        <button class="rv-retry-btn" (click)="loadRecordings()">Thử lại</button>
+      </div>
+
       <!-- Video Grid -->
-      <div class="rv-clip-grid" [class.list-view]="viewMode() === 'list'">
+      <div class="rv-clip-grid" [class.list-view]="viewMode() === 'list'" *ngIf="!isLoading() && !errorMessage()">
 
         <!-- Actual clip cards -->
         <div
           class="rv-clip-card"
-          *ngFor="let rec of recordings"
+          [class.rv-clip-card--starting]="rec.status === 'STARTING'"
+          [class.rv-clip-card--recording]="rec.status === 'RECORDING'"
+          [class.rv-clip-card--failed]="rec.status === 'FAILED'"
+          *ngFor="let rec of filteredRecordings"
           (click)="openRecording(rec)"
         >
+          <!-- Thumbnail -->
           <div class="rv-clip-thumb">
-            <img [src]="rec.thumbnailUrl" [alt]="rec.title" class="rv-clip-img" />
-            <div class="rv-clip-duration">
-              <span class="material-symbols-outlined rv-play-icon">play_arrow</span>
-              <span>{{ rec.duration }}</span>
+            <!-- Video preview: #t=1 forces browser to seek to 1s → shows first frame -->
+            <video
+              *ngIf="rec.fileUrl"
+              class="rv-clip-video-thumb"
+              [src]="rec.fileUrl + '#t=1'"
+              preload="metadata"
+              muted
+              playsinline
+            ></video>
+            <!-- Fallback icon when no fileUrl -->
+            <div class="rv-clip-thumb-placeholder" *ngIf="!rec.fileUrl">
+              <span class="material-symbols-outlined rv-thumb-icon">
+                {{ rec.status === 'STARTING' ? 'hourglass_top' : rec.status === 'RECORDING' ? 'radio_button_checked' : 'error_outline' }}
+              </span>
             </div>
-            <div class="rv-clip-hover-overlay">
+            <div class="rv-clip-duration" *ngIf="rec.status === 'COMPLETED' && rec.duration > 0">
+              <span class="material-symbols-outlined rv-play-icon">play_arrow</span>
+              <span>{{ formatDuration(rec.duration) }}</span>
+            </div>
+            <div class="rv-clip-hover-overlay" *ngIf="rec.status === 'COMPLETED'">
               <span class="material-symbols-outlined rv-hover-play">play_circle</span>
             </div>
           </div>
+
+          <!-- Info -->
           <div class="rv-clip-info">
             <div class="rv-clip-title-row">
-              <h3 class="rv-clip-title">{{ rec.title }}</h3>
+              <h3 class="rv-clip-title">{{ rec.recordingName }}</h3>
               <button class="rv-clip-more" (click)="$event.stopPropagation()">
                 <span class="material-symbols-outlined">more_horiz</span>
               </button>
             </div>
+
+            <!-- Host info + actions on same row -->
             <div class="rv-clip-meta">
-              <img [src]="rec.avatarUrl" [alt]="rec.creator" class="rv-clip-avatar" />
+              <img [src]="rec.hostAvatar" [alt]="rec.hostName" class="rv-clip-avatar" />
               <div class="rv-clip-meta-text">
-                <span class="rv-clip-creator">{{ rec.creator }}</span>
-                <span class="rv-clip-time">{{ rec.createdAt }}</span>
+                <span class="rv-clip-creator">{{ rec.hostName }}</span>
+                <span class="rv-clip-time">{{ formatRelativeTime(rec.createdAt) }}</span>
               </div>
-              <button class="rv-clip-link" (click)="$event.stopPropagation()">
+              <!-- Copy share link (only if shareToken exists) -->
+              <button
+                *ngIf="rec.shareToken"
+                class="rv-clip-link"
+                title="Sao chép liên kết chia sẻ"
+                (click)="copyShareLink(rec, $event)"
+              >
                 <span class="material-symbols-outlined">link</span>
+              </button>
+              <!-- Download (if fileUrl exists) -->
+              <button
+                *ngIf="rec.fileUrl"
+                class="rv-clip-download"
+                title="Tải xuống"
+                (click)="downloadFile(rec, $event)"
+              >
+                <span class="material-symbols-outlined">download</span>
               </button>
             </div>
           </div>
         </div>
 
+        <!-- Empty state when filtered has 0 results -->
+        <div class="rv-empty-state" *ngIf="filteredRecordings.length === 0 && !isLoading()">
+          <span class="material-symbols-outlined rv-empty-icon">videocam_off</span>
+          <p>Không tìm thấy bản ghi nào.</p>
+        </div>
+
         <!-- Placeholder "Add" card -->
-        <div class="rv-clip-card rv-placeholder">
+        <div class="rv-clip-card rv-placeholder" *ngIf="filteredRecordings.length > 0">
           <div class="rv-clip-thumb rv-placeholder-thumb">
             <span class="material-symbols-outlined rv-placeholder-icon">add</span>
           </div>
@@ -157,6 +223,7 @@
             <div class="rv-placeholder-line rv-line-sm"></div>
           </div>
         </div>
+
       </div>
 
     </div>

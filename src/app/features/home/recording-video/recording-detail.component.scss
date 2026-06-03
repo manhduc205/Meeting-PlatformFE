@@ -150,12 +150,31 @@ $transition: 0.2s ease;
   margin-bottom: 24px;
 }
 
-.rd-player-bg {
+// Native video element inside the player
+.rd-player-video {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  opacity: 0.5;
+  display: block;
+  background: #000;
 }
+
+// Dark gradient fallback when no video
+.rd-player-bg-fallback {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, #232427 0%, #000 100%);
+}
+
+// Download button variant (link styled as button)
+.rd-download-btn {
+  text-decoration: none;
+  background: #16a34a !important;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3) !important;
+
+  &:hover { opacity: 0.9; }
+}
+
 
 .rd-player-overlay {
   position: absolute;
@@ -750,4 +769,265 @@ $transition: 0.2s ease;
   &:hover { opacity: 0.85; }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
   .material-symbols-outlined { font-size: 20px; }
+}
+
+// ── Status chip ──────────────────────────────────────────────────────────────
+.rd-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+
+  &.chip-completed { background: #dcfce7; color: #15803d; }
+  &.chip-recording { background: #fee2e2; color: #dc2626; }
+  &.chip-starting  { background: #fef9c3; color: #854d0e; }
+  &.chip-failed    { background: #f1f5f9; color: #64748b; }
+}
+
+.rd-status-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dc2626;
+  animation: rd-pulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes rd-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+// ── Visibility chip ──────────────────────────────────────────────────────────
+.rd-visibility-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: $text-light;
+
+  .rd-vis-icon { font-size: 14px !important; }
+}
+
+// ── Info tags (meeting code, egress id, share token) ────────────────────────
+.rd-info-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rd-info-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: #f1f5f9;
+  border: 1px solid $border;
+  border-radius: 6px;
+  font-size: 11px;
+  color: $text-mid;
+  font-weight: 500;
+
+  .material-symbols-outlined { font-size: 13px !important; }
+}
+
+.rd-egress-tag {
+  font-family: monospace;
+  font-size: 10px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// ── Host avatar in meta row ──────────────────────────────────────────────────
+.rd-meta-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+// ── Metadata card ────────────────────────────────────────────────────────────
+.rd-meta-card {
+  background: #f8fafc;
+  border: 1px solid $border;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.rd-meta-card-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+
+  &:last-child { border-bottom: none; }
+}
+
+.rd-meta-card-label {
+  flex-shrink: 0;
+  width: 130px;
+  font-size: 11px;
+  font-weight: 700;
+  color: $text-light;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rd-meta-card-value {
+  flex: 1;
+  font-size: 13px;
+  color: $text-dark;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &.rd-meta-code {
+    font-family: monospace;
+    background: #e8f0fe;
+    color: #0d59f2;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    font-size: 12px;
+  }
+
+  &.rd-meta-token {
+    font-family: monospace;
+    font-size: 11px;
+    color: $text-mid;
+  }
+}
+
+.rd-meta-host {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .rd-meta-host-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+}
+
+.rd-meta-vis {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .rd-vis-icon { font-size: 16px !important; color: $text-mid; }
+}
+
+.rd-meta-card-link {
+  color: $primary;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+
+  &:hover { text-decoration: underline; }
+}
+
+// ── Player status overlay ────────────────────────────────────────────────────
+.rd-player-status-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.5);
+}
+
+.rd-status-big-icon {
+  font-size: 56px !important;
+  color: #fff;
+  opacity: 0.9;
+}
+
+.rd-status-big-label {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.rd-status-sub-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+}
+
+// ── Loading / Error states ───────────────────────────────────────────────────
+.rd-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: $text-mid;
+  font-size: 14px;
+}
+
+.rd-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: $primary;
+  border-radius: 50%;
+  animation: rd-spin 0.75s linear infinite;
+}
+
+@keyframes rd-spin {
+  to { transform: rotate(360deg); }
+}
+
+.rd-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #dc2626;
+  font-size: 14px;
+
+  .material-symbols-outlined { font-size: 48px; }
+
+  p { margin: 0; color: $text-mid; }
+}
+
+.rd-back-btn-plain {
+  padding: 8px 20px;
+  background: #f1f5f9;
+  border: 1px solid $border;
+  border-radius: 8px;
+  font-size: 13px;
+  color: $text-mid;
+  cursor: pointer;
+  transition: background $transition;
+
+  &:hover { background: #e2e8f0; }
+}
+
+// ── Disabled share btn ───────────────────────────────────────────────────────
+.rd-share-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

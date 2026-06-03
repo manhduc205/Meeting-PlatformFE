@@ -36,6 +36,7 @@ export class AuthService {
   private async initializeUser() {
     if (this.keycloak.authenticated) {
       try {
+        console.log('Access Token:', this.keycloak.token);
         const profile = await this.keycloak.loadUserProfile();
         const user = this.mapKeycloakProfileToUser(profile, this.keycloak.tokenParsed);
         this.currentUser.set(user);
@@ -141,7 +142,8 @@ export class AuthService {
    * Get Keycloak token
    */
   async getToken(): Promise<string> {
-    return this.keycloak.token || '';
+  console.log('Access Token:', this.keycloak.token);
+  return this.keycloak.token || '';
   }
 
   /**

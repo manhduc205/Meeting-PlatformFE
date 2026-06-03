@@ -1,3 +1,5 @@
+@use 'sass:color';
+
 $primary: #0d59f2;
 $primary-light: rgba(13, 89, 242, 0.08);
 $border: #e2e4e7;
@@ -434,6 +436,15 @@ $text-light: #94a3b8;
   display: block;
 }
 
+// Video preview in grid card
+.rv-clip-video-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none; // clicks bubble to card, not video
+}
+
 .rv-clip-duration {
   position: absolute;
   bottom: 6px;
@@ -569,6 +580,26 @@ $text-light: #94a3b8;
   .material-symbols-outlined { font-size: 18px; }
 }
 
+// Actions group in footer
+.rv-clip-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+// Download button
+.rv-clip-download {
+  background: none;
+  border: none;
+  color: $text-light;
+  cursor: pointer;
+  display: flex;
+  transition: color 0.15s;
+
+  &:hover { color: #16a34a; }
+  .material-symbols-outlined { font-size: 18px; }
+}
+
 .rv-placeholder-info {
   padding-top: 10px;
   display: flex;
@@ -584,3 +615,244 @@ $text-light: #94a3b8;
   &.rv-line-lg { width: 75%; }
   &.rv-line-sm { width: 50%; }
 }
+
+// ===========================
+// Thumbnail placeholder (no image)
+// ===========================
+.rv-clip-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+
+  .rv-thumb-icon {
+    font-size: 36px !important;
+    color: #94a3b8;
+  }
+}
+
+// ===========================
+// Status badge
+// ===========================
+.rv-clip-status-badge {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  backdrop-filter: blur(4px);
+
+  &.status-completed {
+    background: rgba(22, 163, 74, 0.88);
+    color: #fff;
+  }
+  &.status-recording {
+    background: rgba(220, 38, 38, 0.9);
+    color: #fff;
+  }
+  &.status-starting {
+    background: rgba(234, 179, 8, 0.88);
+    color: #1a1a1a;
+  }
+  &.status-failed {
+    background: rgba(100, 116, 139, 0.85);
+    color: #fff;
+  }
+}
+
+.rv-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  animation: pulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
+}
+
+// Card border tints per status
+.rv-clip-card--starting .rv-clip-thumb {
+  border-color: #fde68a;
+}
+.rv-clip-card--recording .rv-clip-thumb {
+  border-color: #fca5a5;
+}
+.rv-clip-card--failed .rv-clip-thumb {
+  border-color: #cbd5e1;
+}
+
+// ===========================
+// Meeting code tag
+// ===========================
+.rv-clip-meeting-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  color: $text-light;
+  font-weight: 500;
+
+  .material-symbols-outlined { font-size: 13px !important; }
+}
+
+// ===========================
+// Clip footer (visibility + link)
+// ===========================
+.rv-clip-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.rv-clip-visibility {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: $text-light;
+  font-weight: 500;
+}
+
+.rv-vis-icon { font-size: 14px !important; }
+.rv-vis-label { }
+
+// ===========================
+// Meeting info bar
+// ===========================
+.rv-meeting-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #0369a1;
+
+  .material-symbols-outlined { font-size: 18px; }
+
+  strong { font-weight: 700; }
+}
+
+.rv-meeting-count {
+  margin-left: auto;
+  font-size: 11px;
+  background: #0369a1;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+// ===========================
+// No meetingCode notice
+// ===========================
+.rv-no-code-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fefce8;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #92400e;
+
+  .material-symbols-outlined { font-size: 18px; }
+}
+
+// ===========================
+// Loading state
+// ===========================
+.rv-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 0;
+  color: $text-mid;
+  font-size: 14px;
+}
+
+.rv-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: $primary;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+// ===========================
+// Error state
+// ===========================
+.rv-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: #dc2626;
+  font-size: 14px;
+
+  .material-symbols-outlined { font-size: 40px; }
+}
+
+.rv-retry-btn {
+  padding: 8px 20px;
+  background: $primary;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover { background: color.adjust(#0d59f2, $lightness: -8%); }
+}
+
+// ===========================
+// Empty state
+// ===========================
+.rv-empty-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 0;
+  color: $text-light;
+
+  .rv-empty-icon { font-size: 48px !important; }
+
+  p {
+    font-size: 14px;
+    margin: 0;
+  }
+}
+

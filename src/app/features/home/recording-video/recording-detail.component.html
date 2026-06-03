@@ -1,6 +1,21 @@
 <!-- We are inside the HomeComponent's page-content wrapper -->
 <div class="rd-body">
 
+  <!-- Loading state -->
+  <div class="rd-loading" *ngIf="isLoading()">
+    <div class="rd-spinner"></div>
+    <span>Đang tải bản ghi...</span>
+  </div>
+
+  <!-- Error state -->
+  <div class="rd-error" *ngIf="errorMessage() && !isLoading()">
+    <span class="material-symbols-outlined">error_outline</span>
+    <p>{{ errorMessage() }}</p>
+    <button class="rd-back-btn-plain" (click)="goBack()">← Quay lại danh sách</button>
+  </div>
+
+  <ng-container *ngIf="!isLoading() && !errorMessage() && recording()">
+
   <!-- Center: video player + reactions + transcript -->
   <div class="rd-center">
 
@@ -12,32 +27,67 @@
         </button>
         <div>
           <div class="rd-title-row">
-            <h1 class="rd-title">{{ recording.title }}</h1>
+            <h1 class="rd-title">{{ recording()!.title }}</h1>
             <button class="rd-star-btn" (click)="toggleStar()">
               <span class="material-symbols-outlined" [class.filled]="isStarred()">star</span>
             </button>
           </div>
           <div class="rd-title-meta">
-            <span class="rd-meta-author">{{ recording.creator }}</span>
+            <!-- Host avatar + name -->
+            <img [src]="recording()!.hostAvatar" [alt]="recording()!.creator" class="rd-meta-avatar" />
+            <span class="rd-meta-author">{{ recording()!.creator }}</span>
             <span class="rd-meta-dot">•</span>
-            <span class="rd-meta-time">{{ recording.createdAt }}</span>
+            <span class="rd-meta-time" [title]="recording()!.createdAtFull">{{ recording()!.createdAt }}</span>
             <span class="rd-meta-dot">•</span>
-            <div class="rd-meta-views">
-              <span class="material-symbols-outlined rd-views-icon">visibility</span>
-              <span>{{ recording.views }} views</span>
-            </div>
+            <!-- Status badge -->
+            <span class="rd-status-chip" [class]="'chip-' + recording()!.status.toLowerCase()">
+              <span class="rd-status-pulse" *ngIf="recording()!.status === 'RECORDING'"></span>
+              {{ recording()!.statusLabel }}
+            </span>
+            <span class="rd-meta-dot">•</span>
+            <!-- Visibility -->
+            <span class="rd-visibility-chip">
+              <span class="material-symbols-outlined rd-vis-icon">{{ recording()!.visibilityIcon }}</span>
+              {{ recording()!.visibilityLabel }}
+            </span>
+          </div>
+
+          <!-- Meeting code + egress info row -->
+          <div class="rd-info-tags">
+            <span class="rd-info-tag">
+              <span class="material-symbols-outlined">meeting_room</span>
+              {{ recording()!.meetingCode }}
+            </span>
+            <span class="rd-info-tag rd-egress-tag" title="Egress ID: {{ recording()!.egressId }}">
+              <span class="material-symbols-outlined">tag</span>
+              {{ recording()!.egressId }}
+            </span>
+            <span class="rd-info-tag" *ngIf="recording()!.shareToken">
+              <span class="material-symbols-outlined">share</span>
+              Có liên kết chia sẻ
+            </span>
           </div>
         </div>
       </div>
 
       <div class="rd-title-actions">
-        <button class="rd-share-btn">
-          <span class="material-symbols-outlined">share</span>
-          Share
-        </button>
-        <button class="rd-icon-action-btn">
+        <!-- Share link (only if shareToken) -->
+        <button class="rd-share-btn" (click)="copyShareLink()" *ngIf="recording()!.shareToken">
           <span class="material-symbols-outlined">link</span>
+          Sao chép link chia sẻ
         </button>
+        <!-- Download (if fileUrl) -->
+        <a
+          *ngIf="recording()!.fileUrl"
+          [href]="recording()!.fileUrl"
+          target="_blank"
+          rel="noopener"
+          class="rd-share-btn rd-download-btn"
+          (click)="$event.stopPropagation()"
+        >
+          <span class="material-symbols-outlined">download</span>
+          Tải xuống
+        </a>
         <button class="rd-icon-action-btn">
           <span class="material-symbols-outlined">edit</span>
         </button>
@@ -49,17 +99,38 @@
 
     <!-- Video Player -->
     <div class="rd-player">
-      <img [src]="recording.thumbnailUrl" [alt]="recording.title" class="rd-player-bg" />
+      <!-- Actual video when completed + fileUrl -->
+      <video
+        *ngIf="recording()!.status === 'COMPLETED' && recording()!.fileUrl"
+        class="rd-player-video"
+        [src]="recording()!.fileUrl"
+        preload="auto"
+        playsinline
+        #videoEl
+      ></video>
+      <!-- Fallback dark bg when no video -->
+      <div class="rd-player-bg-fallback" *ngIf="!(recording()!.status === 'COMPLETED' && recording()!.fileUrl)"></div>
       <div class="rd-player-overlay">
-        <!-- Play button -->
-        <button class="rd-play-circle" (click)="togglePlay()">
+
+        <!-- Status overlay when not completed -->
+        <div class="rd-player-status-overlay" *ngIf="recording()!.status !== 'COMPLETED'">
+          <span class="material-symbols-outlined rd-status-big-icon">
+            {{ recording()!.status === 'STARTING' ? 'hourglass_top' : recording()!.status === 'RECORDING' ? 'radio_button_checked' : 'error_outline' }}
+          </span>
+          <span class="rd-status-big-label">{{ recording()!.statusLabel }}</span>
+          <span class="rd-status-sub-label" *ngIf="recording()!.status === 'STARTING'">Bản ghi đang được xử lý...</span>
+          <span class="rd-status-sub-label" *ngIf="recording()!.status === 'RECORDING'">Cuộc họp đang được ghi lại...</span>
+        </div>
+
+        <!-- Play button (only when completed) -->
+        <button class="rd-play-circle" (click)="togglePlay()" *ngIf="recording()!.status === 'COMPLETED'">
           <span class="material-symbols-outlined rd-play-icon">
             {{ isPlaying() ? 'pause' : 'play_arrow' }}
           </span>
         </button>
 
         <!-- Player controls -->
-        <div class="rd-player-controls">
+        <div class="rd-player-controls" *ngIf="recording()!.status === 'COMPLETED'">
           <!-- Progress bar -->
           <div class="rd-progress-track">
             <div class="rd-progress-fill" [style.width.%]="progressPct()">
@@ -76,7 +147,7 @@
                 <button class="rd-ctrl-btn">
                   <span class="material-symbols-outlined">volume_up</span>
                 </button>
-                <span class="rd-time-label">{{ recording.currentTime }} / {{ recording.duration }}</span>
+                <span class="rd-time-label">{{ recording()!.currentTime }} / {{ recording()!.duration }}</span>
               </div>
             </div>
             <div class="rd-controls-right">
@@ -93,7 +164,51 @@
       </div>
     </div>
 
-
+    <!-- Recording metadata card -->
+    <div class="rd-meta-card">
+      <div class="rd-meta-card-row">
+        <span class="rd-meta-card-label">Tên bản ghi</span>
+        <span class="rd-meta-card-value">{{ recording()!.title }}</span>
+      </div>
+      <div class="rd-meta-card-row">
+        <span class="rd-meta-card-label">Người tổ chức</span>
+        <div class="rd-meta-card-value rd-meta-host">
+          <img [src]="recording()!.hostAvatar" [alt]="recording()!.creator" class="rd-meta-host-avatar" />
+          {{ recording()!.creator }}
+        </div>
+      </div>
+      <div class="rd-meta-card-row">
+        <span class="rd-meta-card-label">Mã cuộc họp</span>
+        <span class="rd-meta-card-value rd-meta-code">{{ recording()!.meetingCode }}</span>
+      </div>
+      <div class="rd-meta-card-row">
+        <span class="rd-meta-card-label">Thời lượng</span>
+        <span class="rd-meta-card-value">{{ recording()!.duration }}</span>
+      </div>
+      <div class="rd-meta-card-row">
+        <span class="rd-meta-card-label">Trạng thái</span>
+        <span class="rd-status-chip" [class]="'chip-' + recording()!.status.toLowerCase()">{{ recording()!.statusLabel }}</span>
+      </div>
+      <div class="rd-meta-card-row">
+        <span class="rd-meta-card-label">Quyền riêng tư</span>
+        <span class="rd-meta-card-value rd-meta-vis">
+          <span class="material-symbols-outlined rd-vis-icon">{{ recording()!.visibilityIcon }}</span>
+          {{ recording()!.visibilityLabel }}
+        </span>
+      </div>
+      <div class="rd-meta-card-row">
+        <span class="rd-meta-card-label">Ngày tạo</span>
+        <span class="rd-meta-card-value">{{ recording()!.createdAtFull }}</span>
+      </div>
+      <div class="rd-meta-card-row" *ngIf="recording()!.shareToken">
+        <span class="rd-meta-card-label">Share token</span>
+        <span class="rd-meta-card-value rd-meta-token">{{ recording()!.shareToken }}</span>
+      </div>
+      <div class="rd-meta-card-row" *ngIf="recording()!.fileUrl">
+        <span class="rd-meta-card-label">File URL</span>
+        <a [href]="recording()!.fileUrl" target="_blank" class="rd-meta-card-link">Mở tệp gốc ↗</a>
+      </div>
+    </div>
 
     <!-- Transcript -->
     <div class="rd-transcript">
@@ -101,7 +216,7 @@
       <div class="rd-copy-toast" [class.visible]="copyToastVisible()">✓ Copied!</div>
 
       <div class="rd-transcript-header">
-        <h3 class="rd-transcript-title">Transcript &amp; Notes</h3>
+        <h3 class="rd-transcript-title">Transcript & Notes</h3>
         <div class="rd-transcript-actions">
           <button class="rd-transcript-action-btn" title="Copy all transcript" (click)="copyAllTranscript()">
             <span class="material-symbols-outlined">content_copy</span>
@@ -262,4 +377,6 @@
     </div>
 
   </aside>
+
+  </ng-container>
 </div>

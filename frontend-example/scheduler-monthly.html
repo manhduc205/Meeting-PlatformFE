@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VideoConnect - Scheduler</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-secondary-fixed": "#191c1e",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#00174b",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "primary-container": "#0061ff",
+                        "surface": "#f8f9ff",
+                        "surface-container-high": "#dce9ff",
+                        "primary": "#004bca",
+                        "surface-variant": "#d3e4fe",
+                        "outline": "#737687",
+                        "on-background": "#0b1c30",
+                        "on-tertiary-fixed": "#390c00",
+                        "error": "#ba1a1a",
+                        "on-secondary-container": "#626567",
+                        "tertiary-fixed": "#ffdbd0",
+                        "surface-tint": "#0052dc",
+                        "surface-container-highest": "#d3e4fe",
+                        "secondary-container": "#e0e3e5",
+                        "on-surface-variant": "#424656",
+                        "on-primary-container": "#f1f2ff",
+                        "tertiary": "#9d3000",
+                        "outline-variant": "#c2c6d9",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "inverse-primary": "#b4c5ff",
+                        "on-tertiary-container": "#ffefeb",
+                        "surface-dim": "#cbdbf5",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed-dim": "#c4c7c9",
+                        "on-surface": "#0b1c30",
+                        "inverse-surface": "#213145",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed-variant": "#832700",
+                        "surface-container-low": "#eff4ff",
+                        "secondary": "#5c5f61",
+                        "inverse-on-surface": "#eaf1ff",
+                        "primary-fixed": "#dbe1ff",
+                        "on-primary": "#ffffff",
+                        "surface-bright": "#f8f9ff",
+                        "tertiary-fixed-dim": "#ffb59d",
+                        "surface-container": "#e5eeff",
+                        "secondary-fixed": "#e0e3e5",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed-variant": "#444749",
+                        "tertiary-container": "#c73f00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "40px",
+                        "gutter": "24px",
+                        "xs": "8px",
+                        "sm": "16px",
+                        "margin": "32px",
+                        "base": "4px",
+                        "xl": "64px",
+                        "md": "24px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1.4", "fontWeight": "500" }],
+                        "headline-md": ["20px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.2", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom scrollbar for minimal aesthetic */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F8FAFC; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="hidden md:flex flex-col h-full p-sm space-y-xs bg-surface-container-lowest border-r border-outline-variant docked h-screen left-0 w-64 flex-shrink-0 z-20">
+<div class="mb-lg px-sm pt-sm flex flex-col gap-sm">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary text-[32px] fill">videocam</span>
+<span class="font-headline-md text-headline-md font-black text-primary">VideoConnect</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Collaboration Suite</span>
+<button class="mt-sm bg-primary-container text-on-primary-container font-label-md text-label-md py-sm px-md rounded-lg flex items-center justify-center gap-xs hover:bg-primary transition-colors hover:text-white shadow-[0_4px_12px_rgba(0,97,255,0.15)]">
+<span class="material-symbols-outlined">add</span>
+                New Meeting
+            </button>
+</div>
+<div class="flex-1 space-y-xs">
+<a class="flex items-center gap-md px-sm py-xs rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-all scale-95 active:scale-100 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">home</span>
+                Home
+            </a>
+<a class="flex items-center gap-md px-sm py-xs rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-all scale-95 active:scale-100 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">videocam</span>
+                Meetings
+            </a>
+<a class="flex items-center gap-md px-sm py-xs rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-all scale-95 active:scale-100 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">movie</span>
+                Clips
+            </a>
+<a class="flex items-center gap-md px-sm py-xs rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-all scale-95 active:scale-100 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">contacts</span>
+                Contacts
+            </a>
+<a class="flex items-center gap-md px-sm py-xs rounded-lg bg-surface-container text-primary font-bold scale-95 transition-all font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined fill">calendar_today</span>
+                Scheduler
+            </a>
+<a class="flex items-center gap-md px-sm py-xs rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-all scale-95 active:scale-100 font-label-md text-label-md mt-auto" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+</div>
+</nav>
+<div class="flex-1 flex flex-col h-full min-w-0">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-gutter h-16 bg-surface-container-lowest border-b border-outline-variant docked full-width top-0 z-10 flex-shrink-0">
+<div class="flex-1">
+<!-- Search could go here if needed per json, but keeping minimal as requested -->
+</div>
+<div class="flex items-center gap-sm">
+<button class="p-xs rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-xs rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant overflow-hidden cursor-pointer ml-xs">
+<img alt="User profile photo" class="w-full h-full object-cover" data-alt="A professional headshot of a person looking directly at the camera. Soft, high-key lighting creates a bright, modern corporate aesthetic. The background is a clean, neutral white. The person appears approachable and competent, fitting a minimalist tech workspace style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSS-q0DnuoPG-WWuUyrM1GsBbKVnTVIl31BHXbrzK2s1wYEYhr6NpLPv6D7zYg7ojGqypaUqeVA0muE4TrlHQKcYP2o8efZos1Ry4yQ9_dGFwrtQg8SQF2GcMPGRO-nX4qJ2Tc02_FouR40zdpz1e2MELZzKm3TgR9OgmVW9ulYFnWwUZ2gQt26gEWdiCd4oblO6BRFyWSpXcqjfH2tecaO4yTe4CPltmbHhSCcOxQJ5Z3KDho2VM4yJWlZ8Yz26OL8igv2ZM4rCo"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-auto bg-white p-margin flex flex-col">
+<!-- Scheduler Header Controls -->
+<div class="flex justify-between items-center mb-lg flex-shrink-0">
+<div class="flex items-center gap-md">
+<button class="px-md py-xs border border-[#E2E8F0] rounded-lg font-label-md text-label-md text-on-surface hover:bg-[#F8FAFC] transition-colors bg-white">
+                        Today
+                    </button>
+<div class="flex items-center gap-xs">
+<button class="p-xs rounded-full hover:bg-[#F8FAFC] text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="p-xs rounded-full hover:bg-[#F8FAFC] text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-background ml-sm">May 2026</h1>
+</div>
+<div class="flex bg-[#F8FAFC] p-base rounded-lg border border-[#E2E8F0]">
+<button class="px-md py-xs rounded font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors">Day</button>
+<button class="px-md py-xs rounded font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors">Week</button>
+<button class="px-md py-xs rounded bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05)] font-label-md text-label-md text-primary font-bold">Month</button>
+</div>
+</div>
+<!-- Calendar Grid -->
+<div class="flex-1 border border-[#E2E8F0] rounded-lg flex flex-col overflow-hidden bg-white">
+<!-- Days Header -->
+<div class="grid grid-cols-7 border-b border-[#E2E8F0] bg-[#F8FAFC] flex-shrink-0">
+<div class="py-xs text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Mon</div>
+<div class="py-xs text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider border-l border-[#E2E8F0]">Tue</div>
+<div class="py-xs text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider border-l border-[#E2E8F0]">Wed</div>
+<div class="py-xs text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider border-l border-[#E2E8F0]">Thu</div>
+<div class="py-xs text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider border-l border-[#E2E8F0]">Fri</div>
+<div class="py-xs text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider border-l border-[#E2E8F0]">Sat</div>
+<div class="py-xs text-center font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider border-l border-[#E2E8F0]">Sun</div>
+</div>
+<!-- Grid Cells -->
+<!-- Assuming 5 rows for a typical month view to fill space -->
+<div class="flex-1 grid grid-cols-7 grid-rows-5 min-h-[600px]">
+<!-- Row 1 -->
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base opacity-50 bg-[#F8FAFC]">
+<span class="font-label-sm text-label-sm text-on-surface-variant text-right">27</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base opacity-50 bg-[#F8FAFC]">
+<span class="font-label-sm text-label-sm text-on-surface-variant text-right">28</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base opacity-50 bg-[#F8FAFC]">
+<span class="font-label-sm text-label-sm text-on-surface-variant text-right">29</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base opacity-50 bg-[#F8FAFC]">
+<span class="font-label-sm text-label-sm text-on-surface-variant text-right">30</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base relative">
+<span class="font-label-sm text-label-sm text-on-surface text-right">1</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">2</span>
+</div>
+<div class="border-b border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">3</span>
+</div>
+<!-- Row 2 -->
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">4</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">5</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">6</span>
+<!-- Event 1 -->
+<div class="bg-[#EFF6FF] border-l-2 border-[#3B82F6] rounded-r p-base flex justify-between items-start cursor-pointer hover:shadow-sm transition-shadow">
+<div>
+<div class="font-label-sm text-[10px] text-[#1E3A8A] font-bold">10:00 AM</div>
+<div class="font-label-sm text-[11px] text-[#1E40AF] truncate leading-tight mt-[2px]">Team Sync</div>
+</div>
+<img alt="calendar icon" class="w-3 h-3 opacity-70" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbrL-KDvEcVHwt5cq-cbVtBszHCwUtwieSWBhSPblPiCBlvqYvKUtCWeDSgVz89KwEAqmzxJYT2BhTotNSNCoJ3W9m0ShGDH_rlvV02M6-INGGCU5ShUVJB4EbDsGrFG1aNg8iw1fhPhq5J90K1e6gJLf84cRw_8QZD5L-fSUlN_jbsvx4pHxpvFGvDBNYNl48FPcf5cKT1HD41FxMO-f6-xFMPdamGvRHotN-G_6ypU-pzKsdqFUQMNXaZ7e7901Ed2lihoZQ5AI"/>
+</div>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">7</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">8</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">9</span>
+</div>
+<div class="border-b border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">10</span>
+</div>
+<!-- Row 3 -->
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">11</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base bg-surface-container-low">
+<span class="font-label-sm text-label-sm text-primary font-bold text-right flex items-center justify-end gap-xs">
+<span class="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
+                            12
+                        </span>
+<!-- Event 2 -->
+<div class="bg-[#F3E8FF] border-l-2 border-[#A855F7] rounded-r p-base flex justify-between items-start cursor-pointer hover:shadow-sm transition-shadow">
+<div>
+<div class="font-label-sm text-[10px] text-[#581C87] font-bold">2:00 PM</div>
+<div class="font-label-sm text-[11px] text-[#6B21A8] truncate leading-tight mt-[2px]">Design Review</div>
+</div>
+<img alt="calendar icon" class="w-3 h-3 opacity-70" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbrL-KDvEcVHwt5cq-cbVtBszHCwUtwieSWBhSPblPiCBlvqYvKUtCWeDSgVz89KwEAqmzxJYT2BhTotNSNCoJ3W9m0ShGDH_rlvV02M6-INGGCU5ShUVJB4EbDsGrFG1aNg8iw1fhPhq5J90K1e6gJLf84cRw_8QZD5L-fSUlN_jbsvx4pHxpvFGvDBNYNl48FPcf5cKT1HD41FxMO-f6-xFMPdamGvRHotN-G_6ypU-pzKsdqFUQMNXaZ7e7901Ed2lihoZQ5AI"/>
+</div>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">13</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">14</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">15</span>
+<!-- Event 3 -->
+<div class="bg-[#FCE7F3] border-l-2 border-[#EC4899] rounded-r p-base flex justify-between items-start cursor-pointer hover:shadow-sm transition-shadow">
+<div>
+<div class="font-label-sm text-[10px] text-[#831843] font-bold">4:30 PM</div>
+<div class="font-label-sm text-[11px] text-[#9D174D] truncate leading-tight mt-[2px]">Client Call</div>
+</div>
+<img alt="calendar icon" class="w-3 h-3 opacity-70" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbrL-KDvEcVHwt5cq-cbVtBszHCwUtwieSWBhSPblPiCBlvqYvKUtCWeDSgVz89KwEAqmzxJYT2BhTotNSNCoJ3W9m0ShGDH_rlvV02M6-INGGCU5ShUVJB4EbDsGrFG1aNg8iw1fhPhq5J90K1e6gJLf84cRw_8QZD5L-fSUlN_jbsvx4pHxpvFGvDBNYNl48FPcf5cKT1HD41FxMO-f6-xFMPdamGvRHotN-G_6ypU-pzKsdqFUQMNXaZ7e7901Ed2lihoZQ5AI"/>
+</div>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">16</span>
+</div>
+<div class="border-b border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">17</span>
+</div>
+<!-- Row 4 -->
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">18</span>
+<!-- Event 4 -->
+<div class="bg-[#EFF6FF] border-l-2 border-[#3B82F6] rounded-r p-base flex justify-between items-start cursor-pointer hover:shadow-sm transition-shadow">
+<div>
+<div class="font-label-sm text-[10px] text-[#1E3A8A] font-bold">7:39 PM</div>
+<div class="font-label-sm text-[11px] text-[#1E40AF] truncate leading-tight mt-[2px]">Bài tập: PREP L5</div>
+</div>
+<img alt="calendar icon" class="w-3 h-3 opacity-70" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbrL-KDvEcVHwt5cq-cbVtBszHCwUtwieSWBhSPblPiCBlvqYvKUtCWeDSgVz89KwEAqmzxJYT2BhTotNSNCoJ3W9m0ShGDH_rlvV02M6-INGGCU5ShUVJB4EbDsGrFG1aNg8iw1fhPhq5J90K1e6gJLf84cRw_8QZD5L-fSUlN_jbsvx4pHxpvFGvDBNYNl48FPcf5cKT1HD41FxMO-f6-xFMPdamGvRHotN-G_6ypU-pzKsdqFUQMNXaZ7e7901Ed2lihoZQ5AI"/>
+</div>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">19</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">20</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">21</span>
+<!-- Event 5 -->
+<div class="bg-[#EFF6FF] border-l-2 border-[#3B82F6] rounded-r p-base flex justify-between items-start cursor-pointer hover:shadow-sm transition-shadow">
+<div>
+<div class="font-label-sm text-[10px] text-[#1E3A8A] font-bold">7:39 PM</div>
+<div class="font-label-sm text-[11px] text-[#1E40AF] truncate leading-tight mt-[2px]">Bài tập: PREP L6</div>
+</div>
+<img alt="calendar icon" class="w-3 h-3 opacity-70" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbrL-KDvEcVHwt5cq-cbVtBszHCwUtwieSWBhSPblPiCBlvqYvKUtCWeDSgVz89KwEAqmzxJYT2BhTotNSNCoJ3W9m0ShGDH_rlvV02M6-INGGCU5ShUVJB4EbDsGrFG1aNg8iw1fhPhq5J90K1e6gJLf84cRw_8QZD5L-fSUlN_jbsvx4pHxpvFGvDBNYNl48FPcf5cKT1HD41FxMO-f6-xFMPdamGvRHotN-G_6ypU-pzKsdqFUQMNXaZ7e7901Ed2lihoZQ5AI"/>
+</div>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">22</span>
+</div>
+<div class="border-b border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">23</span>
+</div>
+<div class="border-b border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">24</span>
+</div>
+<!-- Row 5 -->
+<div class="border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">25</span>
+<!-- Event 6 -->
+<div class="bg-[#EFF6FF] border-l-2 border-[#3B82F6] rounded-r p-base flex justify-between items-start cursor-pointer hover:shadow-sm transition-shadow">
+<div>
+<div class="font-label-sm text-[10px] text-[#1E3A8A] font-bold">7:39 PM</div>
+<div class="font-label-sm text-[11px] text-[#1E40AF] truncate leading-tight mt-[2px]">Bài tập: PREP L7</div>
+</div>
+<img alt="calendar icon" class="w-3 h-3 opacity-70" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbrL-KDvEcVHwt5cq-cbVtBszHCwUtwieSWBhSPblPiCBlvqYvKUtCWeDSgVz89KwEAqmzxJYT2BhTotNSNCoJ3W9m0ShGDH_rlvV02M6-INGGCU5ShUVJB4EbDsGrFG1aNg8iw1fhPhq5J90K1e6gJLf84cRw_8QZD5L-fSUlN_jbsvx4pHxpvFGvDBNYNl48FPcf5cKT1HD41FxMO-f6-xFMPdamGvRHotN-G_6ypU-pzKsdqFUQMNXaZ7e7901Ed2lihoZQ5AI"/>
+</div>
+</div>
+<div class="border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">26</span>
+</div>
+<div class="border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">27</span>
+</div>
+<div class="border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">28</span>
+<!-- Event 7 -->
+<div class="bg-[#EFF6FF] border-l-2 border-[#3B82F6] rounded-r p-base flex justify-between items-start cursor-pointer hover:shadow-sm transition-shadow">
+<div>
+<div class="font-label-sm text-[10px] text-[#1E3A8A] font-bold">7:39 PM</div>
+<div class="font-label-sm text-[11px] text-[#1E40AF] truncate leading-tight mt-[2px]">Bài tập: PREP 8+</div>
+</div>
+<img alt="calendar icon" class="w-3 h-3 opacity-70" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbrL-KDvEcVHwt5cq-cbVtBszHCwUtwieSWBhSPblPiCBlvqYvKUtCWeDSgVz89KwEAqmzxJYT2BhTotNSNCoJ3W9m0ShGDH_rlvV02M6-INGGCU5ShUVJB4EbDsGrFG1aNg8iw1fhPhq5J90K1e6gJLf84cRw_8QZD5L-fSUlN_jbsvx4pHxpvFGvDBNYNl48FPcf5cKT1HD41FxMO-f6-xFMPdamGvRHotN-G_6ypU-pzKsdqFUQMNXaZ7e7901Ed2lihoZQ5AI"/>
+</div>
+</div>
+<div class="border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">29</span>
+</div>
+<div class="border-r border-[#E2E8F0] p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">30</span>
+</div>
+<div class="p-xs hover:bg-[#F8FAFC] transition-colors flex flex-col gap-base">
+<span class="font-label-sm text-label-sm text-on-surface text-right">31</span>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
