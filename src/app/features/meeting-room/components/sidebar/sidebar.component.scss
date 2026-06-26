@@ -515,7 +515,7 @@ $accent: #0e71eb;
 
 .waiting-section {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(251, 191, 36, 0.04);
+  background: rgba(251, 191, 36, 0.03);
   flex-shrink: 0;
 }
 
@@ -523,7 +523,14 @@ $accent: #0e71eb;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px 6px;
+  padding: 8px 12px 8px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+
+  &:hover {
+    background: rgba(251, 191, 36, 0.06);
+  }
 
   .waiting-section-title {
     display: flex;
@@ -559,54 +566,106 @@ $accent: #0e71eb;
   }
 }
 
-@keyframes waiting-pulse {
+.waiting-header-right {
+  display: flex;
+  align-items: center;
+}
 
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+.waiting-chevron {
+  display: flex;
+  align-items: center;
+  color: rgba(251, 191, 36, 0.6);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
-  50% {
-    opacity: 0.5;
-    transform: scale(0.7);
+  .material-symbols-outlined { font-size: 18px; }
+
+  &.collapsed {
+    transform: rotate(180deg);
   }
 }
 
-.admit-all-btn {
+// Collapsible body — max-height animation trick
+.waiting-body {
+  overflow: hidden;
+  max-height: 600px;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+  opacity: 1;
+
+  &.collapsed {
+    max-height: 0;
+    opacity: 0;
+  }
+}
+
+// Bulk action bar at top of waiting body
+.waiting-bulk-bar {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px 4px;
+}
+
+.bulk-btn {
+  flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 5px 12px;
-  background: rgba(251, 191, 36, 0.15);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  color: #fbbf24;
+  padding: 5px 8px;
   border-radius: 7px;
-  font-size: 11px;
-  font-weight: 600;
+  border: 1px solid;
+  font-size: 10px;
+  font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   transition: all 0.15s;
 
-  &:hover {
-    background: rgba(251, 191, 36, 0.25);
+  .material-symbols-outlined { font-size: 13px; }
+
+  &.admit {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+
+    &:hover {
+      background: rgba(16, 185, 129, 0.22);
+    }
   }
 
-  .material-symbols-outlined {
-    font-size: 14px;
+  &.reject-all {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: #ef4444;
+
+    &:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
   }
+}
+
+@keyframes waiting-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.7); }
 }
 
 .waiting-list {
-  padding: 2px 0 6px;
+  padding: 2px 0 4px;
 }
 
 .waiting-empty-state {
-  padding: 12px 14px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  padding: 14px 14px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
   text-align: center;
   font-style: italic;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  .material-symbols-outlined {
+    font-size: 22px;
+    opacity: 0.4;
+  }
 }
 
 .waiting-row {
@@ -618,6 +677,17 @@ $accent: #0e71eb;
 
   &:hover {
     background: rgba(255, 255, 255, 0.04);
+
+    // Reveal colored buttons on row hover
+    .w-btn.approve {
+      background: rgba(16, 185, 129, 0.18);
+      color: #10b981;
+    }
+
+    .w-btn.reject {
+      background: rgba(239, 68, 68, 0.16);
+      color: #ef4444;
+    }
   }
 }
 
@@ -640,6 +710,7 @@ $accent: #0e71eb;
   flex-shrink: 0;
 }
 
+// Per-row approve/reject buttons: neutral by default, colored on parent hover
 .w-btn {
   width: 28px;
   height: 28px;
@@ -647,30 +718,26 @@ $accent: #0e71eb;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  // Start neutral
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.35);
 
-  .material-symbols-outlined {
-    font-size: 15px;
+  .material-symbols-outlined { font-size: 15px; }
+
+  // Explicit hover overrides (in case user hovers button without hovering row)
+  &.approve:hover {
+    background: rgba(16, 185, 129, 0.28) !important;
+    color: #10b981 !important;
+    border-color: rgba(16, 185, 129, 0.3);
   }
 
-  &.approve {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-
-    &:hover {
-      background: rgba(16, 185, 129, 0.28);
-    }
-  }
-
-  &.reject {
-    background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
-
-    &:hover {
-      background: rgba(239, 68, 68, 0.24);
-    }
+  &.reject:hover {
+    background: rgba(239, 68, 68, 0.24) !important;
+    color: #ef4444 !important;
+    border-color: rgba(239, 68, 68, 0.3);
   }
 }
 

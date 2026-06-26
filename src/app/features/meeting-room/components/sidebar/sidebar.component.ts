@@ -6,9 +6,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MeetingStateService } from '../../services/meeting-state.service';
 import { SidebarTab } from '../../models/meeting.model';
-import { MeetingService } from '../../../../core/services/meeting.service';
+import { MeetingService, ParticipantDto, WaitingParticipantDto } from '../../../../core/services/meeting.service';
 import { HostControlService } from '../../services/host-control.service';
-import { ParticipantDto } from '../../../../core/services/meeting.service';
 import { PollPanelComponent } from '../poll-panel/poll-panel.component';
 import { Subscription } from 'rxjs';
 
@@ -62,55 +61,73 @@ interface TabDef { id: SidebarTab; icon: string; label: string; hostOnly?: boole
 
             <!-- ══ WAITING ROOM SECTION (host only, shown above active participants) ══ -->
             <div class="waiting-section" *ngIf="ms.isHost()">
-              <div class="waiting-section-header">
+              <!-- Collapsible header -->
+              <div class="waiting-section-header" (click)="toggleWaitingCollapsed()">
                 <div class="waiting-section-title">
                   <span class="waiting-pulse-dot" *ngIf="ms.waitingParticipants().length > 0"></span>
-                  <span>Phòng chờ</span>
+                  <span>Đang chờ tham gia</span>
                   <span class="waiting-count-badge" *ngIf="ms.waitingParticipants().length > 0">{{ ms.waitingParticipants().length }}</span>
                 </div>
-                <button class="admit-all-btn" *ngIf="ms.waitingParticipants().length > 0" (click)="ms.admitAllWaiting()">
-                  <span class="material-symbols-outlined">done_all</span>
-                  Duyệt tất cả
-                </button>
+                <div class="waiting-header-right">
+                  <span class="waiting-chevron" [class.collapsed]="waitingCollapsed()">
+                    <span class="material-symbols-outlined">expand_less</span>
+                  </span>
+                </div>
               </div>
 
-              <div class="waiting-list">
-                <div *ngIf="ms.waitingParticipants().length === 0" class="waiting-empty-state">
-                  Không có ai đang chờ
+              <!-- Collapsible body -->
+              <div class="waiting-body" [class.collapsed]="waitingCollapsed()">
+                <!-- Bulk action bar (only when there are waiting participants) -->
+                <div class="waiting-bulk-bar" *ngIf="ms.waitingParticipants().length > 0">
+                  <button class="bulk-btn admit" (click)="$event.stopPropagation(); ms.admitAllWaiting()">
+                    <span class="material-symbols-outlined">done_all</span>
+                    Duyệt tất cả
+                  </button>
+                  <button class="bulk-btn reject-all" (click)="$event.stopPropagation(); rejectAllWaiting()">
+                    <span class="material-symbols-outlined">remove_done</span>
+                    Từ chối tất cả
+                  </button>
                 </div>
-                <div
-                  class="waiting-row"
-                  *ngFor="let p of ms.waitingParticipants(); trackBy: trackById"
-                >
-                  <!-- Avatar -->
-                  <div class="p-avatar waiting-avatar"
-                       [style.background-image]="p.avatarUrl ? 'url(' + p.avatarUrl + ')' : ''"
-                       [style.background-color]="!p.avatarUrl ? getAvatarColor(p.id) : 'transparent'">
-                    <span *ngIf="!p.avatarUrl">{{ getInitials(p) }}</span>
-                  </div>
 
-                  <!-- Name -->
-                  <div class="p-info">
-                    <span class="p-name">{{ p.fullName || p.firstName }}</span>
-                    <span class="waiting-tag">Đang chờ...</span>
+                <div class="waiting-list">
+                  <div *ngIf="ms.waitingParticipants().length === 0" class="waiting-empty-state">
+                    <span class="material-symbols-outlined">people_outline</span>
+                    Không có ai đang chờ
                   </div>
+                  <div
+                    class="waiting-row"
+                    *ngFor="let p of ms.waitingParticipants(); trackBy: trackById"
+                  >
+                    <!-- Avatar -->
+                    <div class="p-avatar waiting-avatar"
+                         [style.background-image]="p.avatarUrl ? 'url(' + p.avatarUrl + ')' : ''"
+                         [style.background-color]="!p.avatarUrl ? getAvatarColor(p.id) : 'transparent'">
+                      <span *ngIf="!p.avatarUrl">{{ getWaitingInitials(p) }}</span>
+                    </div>
 
-                  <!-- Approve / Reject buttons -->
-                  <div class="waiting-actions">
-                    <button
-                      class="w-btn approve"
-                      title="Cho phép vào"
-                      (click)="ms.approveWaitingUser(p.id)"
-                    >
-                      <span class="material-symbols-outlined">check</span>
-                    </button>
-                    <button
-                      class="w-btn reject"
-                      title="Từ chối"
-                      (click)="ms.rejectWaitingUser(p.id)"
-                    >
-                      <span class="material-symbols-outlined">close</span>
-                    </button>
+                    <!-- Name -->
+                    <div class="p-info">
+                      <span class="p-name">{{ p.fullName || p.firstName }}</span>
+                      <span class="waiting-tag">Đang chờ...</span>
+                    </div>
+
+                    <!-- Approve / Reject icon buttons (hover reveals color) -->
+                    <div class="waiting-actions">
+                      <button
+                        class="w-btn approve"
+                        title="Cho phép vào"
+                        (click)="$event.stopPropagation(); ms.approveWaitingUser(p.id)"
+                      >
+                        <span class="material-symbols-outlined">check</span>
+                      </button>
+                      <button
+                        class="w-btn reject"
+                        title="Từ chối"
+                        (click)="$event.stopPropagation(); ms.rejectWaitingUser(p.id)"
+                      >
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -259,6 +276,7 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
   showMoreMenu = signal(false);
   muteOnEntry = signal(false);
   joinSound = signal(true);
+  waitingCollapsed = signal(false);
 
   @ViewChild('chatBottom') private chatBottom!: ElementRef;
   private _subs = new Subscription();
@@ -315,6 +333,14 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
+  toggleWaitingCollapsed(): void {
+    this.waitingCollapsed.update(v => !v);
+  }
+
+  rejectAllWaiting(): void {
+    this.ms.rejectAllWaiting();
+  }
+
   toggleMoreMenu(event: MouseEvent): void {
     event.stopPropagation();
     this.showMoreMenu.update(v => !v);
@@ -364,6 +390,14 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
     return ((p.firstName?.[0] || '') + ((p as any).lastName?.[0] || '')).toUpperCase() || '?';
   }
 
+  /** Separate helper for WaitingParticipantDto (uses fullName field from API) */
+  getWaitingInitials(p: WaitingParticipantDto): string {
+    if (p.fullName) {
+      return p.fullName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+    }
+    return ((p.firstName?.[0] || '') + (p.lastName?.[0] || '')).toUpperCase() || '?';
+  }
+
   getAvatarColor(id: string): string {
     const colors = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#34d399', '#2dd4bf', '#38bdf8', '#818cf8', '#a78bfa', '#e879f9'];
     let hash = 0;
@@ -371,7 +405,7 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
     return colors[Math.abs(hash) % colors.length];
   }
 
-  trackById(_: number, p: ParticipantDto) { return p.id; }
+  trackById(_: number, p: { id: string }) { return p.id; }
 
   ngAfterViewChecked() {
     this.chatBottom?.nativeElement?.scrollIntoView({ behavior: 'smooth' });

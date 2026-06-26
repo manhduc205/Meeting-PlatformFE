@@ -57,12 +57,15 @@ export interface MeetingInfo {
 
 // ── Waiting Room ──────────────────────────────────────────────────────────────
 
+/** Shape returned by GET /host/waiting-room */
 export interface WaitingParticipantDto {
   id: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;       // API trả về fullName
+  firstName?: string;     // optional fallback
+  lastName?: string;
   avatarUrl: string | null;
-  status: 'WAITING';
+  status: 'WAITING' | string;
+  isMe: boolean | null;
 }
 
 export interface WaitingRoomActionRequest {
@@ -100,9 +103,9 @@ export class MeetingService {
 
   // ── Waiting Room (Host only) ───────────────────────────────────────────────
 
-  /** GET /api/v1/meetings/{meetingCode}/host/waiting-room — returns ParticipantDto[] */
-  getWaitingRoom(meetingCode: string): Observable<ParticipantDto[]> {
-    return this.http.get<ParticipantDto[]>(`${this.apiUrl}/${meetingCode}/host/waiting-room`);
+  /** GET /api/v1/meetings/{meetingCode}/host/waiting-room */
+  getWaitingRoom(meetingCode: string): Observable<WaitingParticipantDto[]> {
+    return this.http.get<WaitingParticipantDto[]>(`${this.apiUrl}/${meetingCode}/host/waiting-room`);
   }
 
   /** POST /api/v1/meetings/{meetingCode}/host/waiting-room/action */

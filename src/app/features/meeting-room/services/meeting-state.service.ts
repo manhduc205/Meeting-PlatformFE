@@ -13,7 +13,7 @@ import { PollCreateRequest } from '../models/meeting.types';
 import { firstValueFrom } from 'rxjs';
 import { RecordingService } from './recording.service';
 
-import { MeetingService, ParticipantDto } from '../../../core/services/meeting.service';
+import { MeetingService, ParticipantDto, WaitingParticipantDto } from '../../../core/services/meeting.service';
 
 export type ConnectionState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
@@ -89,10 +89,11 @@ export class MeetingStateService {
   recordingDuration = signal(0);   // seconds elapsed
   private _recordingTimer: ReturnType<typeof setInterval> | null = null;
 
-  // ── Waiting Room state (Host) ───────────────────────────────────────────────
-  waitingParticipants = signal<ParticipantDto[]>([]);
+  // ── Waiting Room state (Host) ──────────────────────────────────────────────
+  waitingParticipants = signal<WaitingParticipantDto[]>([]);
   /** Each knock notification pushed to host via WebSocket */
   hostKnockNotifications = signal<Array<{ id: string; firstName: string; lastName: string; userId: string; timestamp: number }>>([]);
+  private _waitingRoomPollTimer: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Canonical list of participants who have raised their hand.
@@ -229,16 +230,37 @@ export class MeetingStateService {
       await this.media.connect(code);
       this.connectionState.set('connected');
 
-      // Fetch host info and UUID→Name+isMe từ /sidebar (event-driven, chỉ gọi 1 lần khi join)
+      // ── Strategy 1: Sidebar API for participant list + isMe → isHost detection
       this.meetingService.getSidebarParticipants(code).subscribe({
         next: (res) => {
+          console.log('[Host] getSidebarParticipants response:', res);
           this.backendParticipants.set(res);
-          // Dùng isMe từ API thay vì so sánh ID thủ công
           const isHost = res.some(p => p.isMe && p.status === 'HOST');
-          this.isHost.set(isHost);
-          if (isHost) this.loadWaitingRoom();
+          console.log('[Host] isHost from sidebar:', isHost, '| isMe entries:', res.filter(p => p.isMe));
+          if (isHost) {
+            this.isHost.set(true);
+            this._startWaitingRoomPolling();
+          }
         },
-        error: (err: any) => console.error('Failed to load sidebar participants on join', err)
+        error: (err: any) => console.error('[Host] getSidebarParticipants failed:', err)
+      });
+
+      // ── Strategy 2: Probe waiting-room API directly — if 200, user is the host
+      // This fires independently of Strategy 1, so even if sidebar isMe is null,
+      // the host UI still appears.
+      this.meetingService.getWaitingRoom(code).subscribe({
+        next: (list) => {
+          console.log('[Host] Waiting room probe SUCCESS → user IS host. List:', list);
+          this.waitingParticipants.set(list);
+          if (!this.isHost()) {
+            this.isHost.set(true);
+            this._startWaitingRoomPolling();
+          }
+        },
+        error: (err: any) => {
+          // 403 = not host, any other error = network issue
+          console.log('[Host] Waiting room probe result (403 = not host):', err?.status, err?.message);
+        }
       });
 
     } catch (e) {
@@ -336,13 +358,26 @@ export class MeetingStateService {
       })
     );
 
-    // ── STOMP: Presence (update Name + Host when people join/leave) ────────
+    // ── STOMP: Presence (update Name + Host when people join/leave) ────
     this.subs.add(
       this.signaling.presence$.subscribe(msg => {
         if (msg.type === 'JOIN' || msg.type === 'USER_LIST_SYNC' || msg.type === 'LEAVE') {
           // Event-driven: gọi /sidebar để cập nhật danh sách khi có người vào/ra
           this.meetingService.getSidebarParticipants(code).subscribe({
-            next: (res) => this.backendParticipants.set(res),
+            next: (res) => {
+              this.backendParticipants.set(res);
+              // Re-derive isHost each time sidebar refreshes (in case token arrives late)
+              const isHost = res.some(p => p.isMe && p.status === 'HOST');
+              if (isHost && !this.isHost()) {
+                this.isHost.set(true);
+                this.loadWaitingRoom();
+                this._startWaitingRoomPolling();
+              } else if (!isHost && this.isHost()) {
+                // Edge case: host role revoked
+                this.isHost.set(false);
+                this._stopWaitingRoomPolling();
+              }
+            },
             error: (err: any) => console.error('Failed to reload sidebar participants', err)
           });
         }
@@ -443,10 +478,9 @@ export class MeetingStateService {
       })
     );
 
-    // ── Load initial waiting room list for host ───────────────────────────────
-    if (this.isHost()) {
-      this.loadWaitingRoom();
-    }
+    // ── Load initial waiting room list for host ───────────────────────────────────────
+    // NOTE: isHost() is async (set inside getSidebarParticipants callback above).
+    // The _startWaitingRoomPolling() call inside that callback handles the initial load.
   }
 
   private _handleDataMessage(payload: any, participantIdentity: string): void {
@@ -476,6 +510,7 @@ export class MeetingStateService {
     this.isLocalSpeaking.set(false);
     this.connectionState.set('idle');
     this._stopRecordingTimer();
+    this._stopWaitingRoomPolling();
   }
 
   // ── Recording actions ─────────────────────────────────────────────────────
@@ -540,9 +575,27 @@ export class MeetingStateService {
 
   // ── Waiting Room Actions (Host) ─────────────────────────────────────────────
 
+  /** Poll the waiting room every 5 s while the host is in the meeting. */
+  private _startWaitingRoomPolling(): void {
+    this._stopWaitingRoomPolling(); // clear any existing timer
+    this.loadWaitingRoom();          // immediate first fetch
+    this._waitingRoomPollTimer = setInterval(() => {
+      if (this.connectionState() === 'connected' || this.connectionState() === 'reconnecting') {
+        this.loadWaitingRoom();
+      }
+    }, 5000);
+  }
+
+  private _stopWaitingRoomPolling(): void {
+    if (this._waitingRoomPollTimer) {
+      clearInterval(this._waitingRoomPollTimer);
+      this._waitingRoomPollTimer = null;
+    }
+  }
+
   loadWaitingRoom(): void {
     const code = this.meetingCode();
-    if (!code || !this.isHost()) return;
+    if (!code) return; // only guard against missing code; isHost checked by caller
     this.meetingService.getWaitingRoom(code).subscribe({
       next: (list) => this.waitingParticipants.set(list),
       error: (err) => console.warn('[WaitingRoom] Failed to load waiting room', err)
@@ -584,6 +637,21 @@ export class MeetingStateService {
       error: () => {
         this.loadWaitingRoom();
         this.showToast('Lỗi khi duyệt tất cả', 'error');
+      }
+    });
+  }
+
+  rejectAllWaiting(): void {
+    const code = this.meetingCode();
+    const userIds = this.waitingParticipants().map(p => p.id);
+    if (userIds.length === 0) return;
+    this.waitingParticipants.set([]);
+    this.hostKnockNotifications.set([]);
+    this.meetingService.processWaitingRoom(code, { action: 'REJECT', userIds }).subscribe({
+      next: () => this.showToast(`❌ Đã từ chối ${userIds.length} người`, 'info'),
+      error: () => {
+        this.loadWaitingRoom();
+        this.showToast('Lỗi khi từ chối tất cả', 'error');
       }
     });
   }
