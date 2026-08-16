@@ -55,6 +55,14 @@ export interface MeetingInfo {
   isWaitingRoomEnabled?: boolean;
 }
 
+export interface MeetingResponse {
+  id: string;
+  meetingCode: string;
+  title: string;
+  status: string;
+  endTime?: string;
+}
+
 // ── Waiting Room ──────────────────────────────────────────────────────────────
 
 /** Shape returned by GET /host/waiting-room */
@@ -111,5 +119,15 @@ export class MeetingService {
   /** POST /api/v1/meetings/{meetingCode}/host/waiting-room/action */
   processWaitingRoom(meetingCode: string, request: WaitingRoomActionRequest): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/${meetingCode}/host/waiting-room/action`, request);
+  }
+
+  /** POST /api/v1/meetings/{meetingCode}/leave — rời phòng (không kết thúc meeting) */
+  leaveMeeting(meetingCode: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${meetingCode}/leave`, {});
+  }
+
+  /** PUT /api/v1/meetings/{meetingCode}/end — kết thúc meeting (host only) */
+  endMeeting(meetingCode: string): Observable<MeetingResponse> {
+    return this.http.put<MeetingResponse>(`${this.apiUrl}/${meetingCode}/end`, {});
   }
 }

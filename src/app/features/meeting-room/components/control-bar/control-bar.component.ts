@@ -291,15 +291,15 @@ const REACTIONS = ['👍', '👏', '😂', '❤️', '🎉', '🤔', '👋'];
 
         <div class="ctrl-divider"></div>
 
-        <!-- End call -->
-        <button class="ctrl-btn danger-btn" (click)="ms.endCall()">
+        <!-- Leave / End call -->
+        <button class="ctrl-btn danger-btn" (click)="ms.openLeaveOrEnd()" id="btn-leave-end">
           <span class="ctrl-icon-wrap">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/>
               <line x1="22" y1="2" x2="2" y2="22"/>
             </svg>
           </span>
-          <span class="ctrl-label">End</span>
+          <span class="ctrl-label">{{ ms.isHost() ? 'End' : 'Leave' }}</span>
         </button>
       </div>
     </div>
@@ -311,8 +311,8 @@ export class ControlBarComponent {
   reactions = REACTIONS;
   showMore = false;
 
-  onMicClick(): void   { this.ms.toggleMic(); }
-  onCamClick(): void   { this.ms.toggleCamera(); }
+  onMicClick(): void { this.ms.toggleMic(); }
+  onCamClick(): void { this.ms.toggleCamera(); }
   onScreenShareClick() { this.ms.toggleScreenShare(); }
 
   /** Send reaction via LiveKit DataChannel */

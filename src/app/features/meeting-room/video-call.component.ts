@@ -13,6 +13,7 @@ import { WhiteboardComponent } from './components/whiteboard/whiteboard.componen
 import { HostToolsPanelComponent } from './components/host-tools-panel/host-tools-panel.component';
 import { RaisedHandsPanelComponent } from './components/raised-hands-panel/raised-hands-panel.component';
 import { KnockNotificationsComponent } from './components/knock-notifications/knock-notifications.component';
+import { LeaveModalComponent } from './components/leave-modal/leave-modal.component';
 
 @Component({
   selector: 'app-video-call',
@@ -29,6 +30,7 @@ import { KnockNotificationsComponent } from './components/knock-notifications/kn
     HostToolsPanelComponent,
     RaisedHandsPanelComponent,
     KnockNotificationsComponent,
+    LeaveModalComponent,
   ],
   templateUrl: './video-call.component.html',
   styleUrls: ['./video-call.component.scss']

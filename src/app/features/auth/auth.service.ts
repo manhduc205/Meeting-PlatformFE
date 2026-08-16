@@ -42,8 +42,11 @@ export class AuthService {
         this.currentUser.set(user);
         this.isAuthenticated.set(true);
         
+        // Đảm bảo token còn hạn và hợp lệ trước khi gọi backend
+        await this.keycloak.updateToken(30);
+
         // Sync user with backend
-        this.http.get(`${environment.backendApiUrl}/sync`, { responseType: 'text' }).subscribe({
+        this.http.get(`${environment.backendApiUrl}/api/users/sync`, { responseType: 'text' }).subscribe({
           next: (res) => console.log('User synchronization response:', res),
           error: (err) => console.error('Failed to synchronize user:', err)
         });

@@ -11,7 +11,9 @@ import { PollSocketPayload } from '../models/meeting.types';
 import { environment } from '../../../../environments/environment';
 
 export interface HostKnockNotification {
-  type: 'NEW_KNOCK' | 'PARTICIPANT_APPROVED' | 'PARTICIPANT_REJECTED';
+  type: 'NEW_KNOCK' | 'PARTICIPANT_APPROVED' | 'PARTICIPANT_REJECTED' | 'WAITING_ROOM_UPDATE';
+  /** For WAITING_ROOM_UPDATE: the action the host took */
+  action?: 'APPROVE' | 'REJECT';
   userId: string;
   firstName: string;
   lastName: string;
@@ -38,6 +40,8 @@ export class SignalingService {
   private _presence$ = new Subject<SignalingMessage>();
   private _actions$ = new Subject<SignalingMessage>();
   private _hostKnock$ = new Subject<HostKnockNotification>();
+  /** Fires whenever the server signals that the participant count changed (user approved/rejected from waiting room) */
+  private _participantsChanged$ = new Subject<{ type: string }>();
 
   private authService = inject(AuthService);
   // Lazy inject to avoid circular deps — these are set BEFORE first subscription
@@ -51,8 +55,10 @@ export class SignalingService {
   readonly presence$: Observable<SignalingMessage> = this._presence$.asObservable();
   /** Room-wide action events (CHAT, MEETING_ENDED, …) */
   readonly actions$: Observable<SignalingMessage> = this._actions$.asObservable();
-  /** Host-specific knock notifcations from waiting room */
+  /** Host-specific knock notifications from waiting room */
   readonly hostKnock$: Observable<HostKnockNotification> = this._hostKnock$.asObservable();
+  /** Fires when backend signals a participant count change (approve/reject from waiting room) */
+  readonly participantsChanged$: Observable<{ type: string }> = this._participantsChanged$.asObservable();
 
   async connect(meetingCode: string, senderId: string): Promise<void> {
     let currentToken = await this.authService.getToken();
@@ -150,8 +156,8 @@ export class SignalingService {
     );
     this.subscriptions.push(pollSub);
 
-    // ── Host Notifications (waiting room knocks) ──────────────────────────
-    // Payload: { type: 'NEW_KNOCK', userId, firstName, lastName, timestamp }
+    // ── Host Notifications (waiting room knocks + approve/reject updates) ──
+    // NEW backend also sends: { type: 'WAITING_ROOM_UPDATE', action: 'APPROVE'|'REJECT', userId: '...' }
     const knockSub = this.client.subscribe(
       `/topic/meeting.${meetingCode}.host-notifications`,
       (msg: IMessage) => {
@@ -164,6 +170,21 @@ export class SignalingService {
       }
     );
     this.subscriptions.push(knockSub);
+
+    // ── Participants Changed topic (approve/reject triggers sidebar refresh) ──
+    // Fired by backend after processWaitingParticipants to signal all clients
+    const pChangedSub = this.client.subscribe(
+      `/topic/meeting.${meetingCode}.participants-changed`,
+      (msg: IMessage) => {
+        try {
+          const payload = JSON.parse(msg.body);
+          this._participantsChanged$.next(payload);
+        } catch (e) {
+          console.warn('[STOMP] Failed to parse participants-changed payload', e);
+        }
+      }
+    );
+    this.subscriptions.push(pChangedSub);
 
     // ── Send JOIN presence ────────────────────────────────────────────────────
     this.sendMessage({

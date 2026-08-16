@@ -41,7 +41,7 @@ export const appConfig: ApplicationConfig = {
       useValue: [
         createInterceptorCondition({
           // Tự động khớp với bất kỳ domain Backend nào bạn cấu hình
-          urlPattern: new RegExp(`^${environment.backendApiUrl}(\\/.*)?$`, 'i'),
+          urlPattern: new RegExp(`^${environment.backendApiUrl}(/.*)?$`, 'i'),
           bearerPrefix: 'Bearer'
         })
       ]

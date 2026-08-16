@@ -176,6 +176,17 @@ export class MediaStreamService {
       throw new Error(`Backend returned ${joinInfo.mode} mode — SFU token unavailable`);
     }
 
+    // ── Fallback: nếu backend trả về URL nội bộ Docker (vd: ws://livekit:7880),
+    //    override bằng public URL từ environment để tránh ERR_NAME_NOT_RESOLVED
+    const isInternalUrl = !joinInfo.serverUrl.includes('.');
+    if (isInternalUrl) {
+      console.warn(
+        `[MediaStream] Backend returned internal serverUrl "${joinInfo.serverUrl}", ` +
+        `overriding with environment.livekitUrl: "${environment.livekitUrl}"`
+      );
+      joinInfo.serverUrl = environment.livekitUrl;
+    }
+
     // ── 3. Tear down any previous room (idempotent) ───────────────────────
     if (this.room) {
       this.room.removeAllListeners();

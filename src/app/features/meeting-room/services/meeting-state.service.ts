@@ -80,6 +80,7 @@ export class MeetingStateService {
   showReactions = signal(false);
   showRaisedHands = signal(false);      // Raised Hands panel visibility
   hasLeft = signal(false);
+  showLeaveModal = signal(false);  // drives leave-modal visibility
   toastMessage = signal<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
   localStream = signal<MediaStream | null>(null);
 
@@ -474,7 +475,29 @@ export class MeetingStateService {
           };
           this.hostKnockNotifications.update(list => [...list, notif]);
           this.loadWaitingRoom();
+        } else if (knock.type === 'WAITING_ROOM_UPDATE') {
+          // Backend confirmed an approve/reject: reactively remove the user
+          // from the host's waiting list without waiting for the 5s poll.
+          if (knock.userId) {
+            this.waitingParticipants.update(list => list.filter(p => p.id !== knock.userId));
+            this.dismissKnockNotification(knock.userId);
+          }
         }
+      })
+    );
+
+    // ── STOMP: Participants Changed (sidebar auto-refresh for everyone) ────
+    // Fired by backend after processWaitingParticipants so ALL clients
+    // (host + active participants) get an up-to-date member count immediately.
+    this.subs.add(
+      this.signaling.participantsChanged$.subscribe(() => {
+        console.log('👥 participants-changed received — refreshing sidebar...');
+        this.meetingService.getSidebarParticipants(code).subscribe({
+          next: (res) => {
+            this.backendParticipants.set(res);
+          },
+          error: (err: any) => console.warn('[ParticipantsChanged] sidebar refresh failed', err)
+        });
       })
     );
 
@@ -817,12 +840,58 @@ export class MeetingStateService {
 
   // ── Leave ─────────────────────────────────────────────────────────────────
 
-  async endCall(): Promise<void> {
+  /**
+   * leaveMeeting: rời phòng mà không kết thúc meeting.
+   * Gọi API POST /{code}/leave rồi cleanup. Dùng cho cả host lẫn participant.
+   */
+  async leaveMeeting(): Promise<void> {
+    const code = this.meetingCode();
     const user = this.auth.getCurrentUser();
-    if (user) this.signaling.sendLeave(this.meetingCode(), user.id);
+
+    // Optimistic: disconnect ngay lập tức
+    if (user) this.signaling.sendLeave(code, user.id);
     await this.cleanupMedia();
     this.hasLeft.set(true);
-    this.showToast('You have left the meeting', 'error');
+    this.showLeaveModal.set(false);
+
+    // Gọi API /leave để backend cập nhật trạng thái
+    this.meetingService.leaveMeeting(code).subscribe({
+      error: (err: any) => console.warn('[Meeting] leaveMeeting API error:', err)
+    });
+  }
+
+  /**
+   * endMeeting: kết thúc meeting (host only).
+   * Gọi API PUT /{code}/end — backend sẽ broadcast MEETING_ENDED cho tất cả.
+   */
+  async endMeeting(): Promise<void> {
+    const code = this.meetingCode();
+    const user = this.auth.getCurrentUser();
+
+    if (user) this.signaling.sendLeave(code, user.id);
+    this.showLeaveModal.set(false);
+
+    // Gọi API /end trước, backend sẽ push MEETING_ENDED → cleanup theo WebSocket
+    this.meetingService.endMeeting(code).subscribe({
+      next: () => {
+        this.cleanupMedia().then(() => {
+          this.hasLeft.set(true);
+        });
+      },
+      error: (err: any) => {
+        console.error('[Meeting] endMeeting API error:', err);
+        this.showToast('Không thể kết thúc cuộc họụp', 'error');
+      }
+    });
+  }
+
+  /** Mở modal leave/end cho host, hoặc leave thẳng cho participant */
+  openLeaveOrEnd(): void {
+    if (this.isHost()) {
+      this.showLeaveModal.set(true);
+    } else {
+      this.leaveMeeting();
+    }
   }
 
   async rejoin(): Promise<void> {

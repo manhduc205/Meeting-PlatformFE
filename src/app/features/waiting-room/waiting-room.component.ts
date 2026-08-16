@@ -55,6 +55,8 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
   waitingMessage = signal('Host đã nhận được yêu cầu. Vui lòng đợi trong giây lát...');
   meetingPassword = '';
   showPasswordField = signal(false);
+  /** Internal user ID returned by the backend join API — used to match WS approval messages */
+  private myInternalUserId: string | null = null;
 
   constructor(private route: ActivatedRoute, private router: Router) {}
 
@@ -151,10 +153,14 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
       meetingPassword: this.meetingPassword || undefined
     }).subscribe({
       next: (response) => {
+        console.log('[WaitingRoom] joinMeeting response:', response);
         if (response.status === 'APPROVED') {
           this.joinStatus.set('APPROVED');
           this._navigateToRoom();
         } else if (response.status === 'WAITING') {
+          // Store the backend internal userId for WS message matching
+          this.myInternalUserId = response.userId ?? null;
+          console.log('[WaitingRoom] Status=WAITING. My internalUserId:', this.myInternalUserId, '| Keycloak id:', this.user?.id);
           this.joinStatus.set('WAITING');
           if (response.message) {
             this.waitingMessage.set(response.message);
@@ -186,24 +192,47 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
         connectHeaders: { Authorization: `Bearer ${token}` },
         reconnectDelay: 2000,
         onConnect: () => {
+          console.log('[WaitingRoom] STOMP connected, subscribing to waiting-room topic for code:', code);
           this.stompClient!.subscribe(
             `/topic/meeting.${code}.waiting-room`,
             (msg: IMessage) => {
               try {
                 const body = JSON.parse(msg.body);
-                const currentUser = this.user;
-                // Check if this approval is for the current user
-                if (
-                  body.type === 'PARTICIPANT_APPROVED' &&
-                  (!body.userId || body.userId === currentUser?.id)
-                ) {
+                const incomingUserId: string | undefined = body.userId;
+                console.log('[WaitingRoom] WS message received:', body,
+                  '| my internalId:', this.myInternalUserId,
+                  '| my keycloakId:', this.user?.id);
+
+                // Support BOTH payload shapes:
+                // NEW backend: { action: 'APPROVED'|'REJECTED', userId: '...' }
+                // OLD backend: { type: 'PARTICIPANT_APPROVED'|'PARTICIPANT_REJECTED', userId: '...' }
+
+                // isForMe: match against internalUserId first (most reliable),
+                // then fall back to Keycloak id, then accept if no userId is set (broadcast).
+                const isForMe =
+                  !incomingUserId ||
+                  (this.myInternalUserId != null && incomingUserId === this.myInternalUserId) ||
+                  incomingUserId === this.user?.id;
+
+                const isApproved =
+                  body.action === 'APPROVED' ||
+                  body.type === 'PARTICIPANT_APPROVED';
+
+                const isRejected =
+                  body.action === 'REJECTED' ||
+                  body.type === 'PARTICIPANT_REJECTED';
+
+                console.log('[WaitingRoom] isForMe:', isForMe, '| isApproved:', isApproved, '| isRejected:', isRejected);
+
+                if (isForMe && isApproved) {
+                  console.log('🔥 Đã được Host duyệt! Đang chuyển hướng vào phòng họp...');
                   this.joinStatus.set('APPROVED');
                   this._navigateToRoom();
-                } else if (
-                  body.type === 'PARTICIPANT_REJECTED' &&
-                  (!body.userId || body.userId === currentUser?.id)
-                ) {
+                } else if (isForMe && isRejected) {
+                  console.log('❌ Bị Host từ chối. Đang chuyển về trang chủ...');
                   this.joinStatus.set('ERROR');
+                  this.waitingMessage.set('Bạn đã bị từ chối tham gia cuộc họp.');
+                  setTimeout(() => this.router.navigate(['/']), 2500);
                 }
               } catch (e) {
                 console.warn('Failed to parse waiting-room WS payload', e);

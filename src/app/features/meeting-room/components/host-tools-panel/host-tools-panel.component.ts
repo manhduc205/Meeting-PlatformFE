@@ -472,7 +472,7 @@ export class HostToolsPanelComponent {
     this.section.set('main');
   }
 
-  endMeeting() { this.ms.endCall(); }
+  endMeeting() { this.ms.endMeeting(); }
 
   // ── Recording ────────────────────────────────────────────────────────
 
