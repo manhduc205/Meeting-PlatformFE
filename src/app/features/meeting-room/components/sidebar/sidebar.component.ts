@@ -193,7 +193,7 @@ interface TabDef { id: SidebarTab; icon: string; label: string; hostOnly?: boole
 
             <!-- Bottom action bar -->
             <div class="p-footer">
-              <button class="p-footer-btn" id="invite-btn">Invite</button>
+              <button class="p-footer-btn" *ngIf="ms.isHost()" id="invite-btn" (click)="openInviteDialog()">Invite</button>
               <button class="p-footer-btn" *ngIf="ms.isHost()" (click)="muteAll()">Mute all</button>
               <div class="p-more-wrap" *ngIf="ms.isHost()">
                 <button class="p-footer-btn p-more-btn" (click)="toggleMoreMenu($event)" id="more-options-btn">···</button>
@@ -263,6 +263,39 @@ interface TabDef { id: SidebarTab; icon: string; label: string; hostOnly?: boole
 
       </div>
     </div>
+
+    <div class="invite-overlay" *ngIf="showInviteDialog()" (click)="closeInviteDialog()">
+      <section class="invite-dialog" (click)="$event.stopPropagation()">
+        <header class="invite-dialog-header">
+          <div>
+            <h3>Invite people</h3>
+            <p>Invitation emails will be sent immediately.</p>
+          </div>
+          <button type="button" class="invite-close-btn" (click)="closeInviteDialog()" title="Close">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </header>
+
+        <div class="invite-input-row" *ngFor="let invitee of inviteeInputs(); let index = index; trackBy: trackInviteeInput">
+          <input type="email" placeholder="name@example.com" [ngModel]="invitee"
+            (ngModelChange)="updateInviteeInput(index, $event)" />
+          <button type="button" class="invite-icon-btn" (click)="addInviteeInput()" title="Add another email">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+          <button type="button" class="invite-icon-btn remove" *ngIf="inviteeInputs().length > 1"
+            (click)="removeInviteeInput(index)" title="Remove email">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <footer class="invite-dialog-footer">
+          <button type="button" class="invite-cancel-btn" (click)="closeInviteDialog()">Cancel</button>
+          <button type="button" class="invite-send-btn" (click)="sendInvitations()" [disabled]="isSendingInvitations()">
+            {{ isSendingInvitations() ? 'Sending…' : 'Send invite' }}
+          </button>
+        </footer>
+      </section>
+    </div>
   `,
   styleUrls: ['./sidebar.component.scss']
 })
@@ -277,6 +310,9 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
   muteOnEntry = signal(false);
   joinSound = signal(true);
   waitingCollapsed = signal(false);
+  showInviteDialog = signal(false);
+  inviteeInputs = signal<string[]>(['']);
+  isSendingInvitations = signal(false);
 
   @ViewChild('chatBottom') private chatBottom!: ElementRef;
   private _subs = new Subscription();
@@ -337,6 +373,58 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
     this.waitingCollapsed.update(v => !v);
   }
 
+  openInviteDialog(): void {
+    if (!this.ms.isHost()) return;
+    this.inviteeInputs.set(['']);
+    this.showInviteDialog.set(true);
+  }
+
+  closeInviteDialog(): void {
+    if (this.isSendingInvitations()) return;
+    this.showInviteDialog.set(false);
+  }
+
+  addInviteeInput(): void {
+    this.inviteeInputs.update(inputs => [...inputs, '']);
+  }
+
+  removeInviteeInput(index: number): void {
+    this.inviteeInputs.update(inputs => inputs.length === 1 ? [''] : inputs.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  updateInviteeInput(index: number, value: string): void {
+    this.inviteeInputs.update(inputs => inputs.map((input, currentIndex) => currentIndex === index ? value : input));
+  }
+
+  trackInviteeInput(index: number): number {
+    return index;
+  }
+
+  sendInvitations(): void {
+    if (!this.ms.isHost() || this.isSendingInvitations()) return;
+    const inviteeEmails = [...new Set(this.inviteeInputs()
+      .flatMap(value => value.split(/[\s,;]+/))
+      .map(email => email.trim().toLowerCase())
+      .filter(Boolean))];
+    if (!inviteeEmails.length) {
+      this.ms.showToast('Nhập ít nhất một email để mời.', 'error');
+      return;
+    }
+
+    this.isSendingInvitations.set(true);
+    this.meetingService.addInvitations(this.ms.meetingCode(), { inviteeEmails }).subscribe({
+      next: invitations => {
+        this.isSendingInvitations.set(false);
+        this.showInviteDialog.set(false);
+        this.ms.showToast(invitations.length ? `Đã gửi ${invitations.length} lời mời.` : 'Các email này đã được mời trước đó.', 'success');
+      },
+      error: error => {
+        this.isSendingInvitations.set(false);
+        this.ms.showToast(error.error?.message || 'Không thể gửi lời mời.', 'error');
+      }
+    });
+  }
+
   rejectAllWaiting(): void {
     this.ms.rejectAllWaiting();
   }
@@ -356,7 +444,7 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
 
   muteParticipant(p: ParticipantDto): void {
     if (!this.ms.isHost()) return;
-    this.hostControlService.sendCommand(this.ms.meetingCode(), 'MUTE_ALL' as any, p.id).subscribe({
+    this.hostControlService.sendCommand(this.ms.meetingCode(), 'MUTE_PARTICIPANT', p.id).subscribe({
       next: () => this.ms.showToast(`Đã tắt mic ${p.firstName}`, 'success'),
       error: () => this.ms.showToast('Không thể tắt mic', 'error')
     });
@@ -377,10 +465,7 @@ export class SidebarComponent implements AfterViewChecked, OnDestroy {
 
   kickParticipant(p: ParticipantDto): void {
     if (!this.ms.isHost()) return;
-    this.hostControlService.sendCommand(this.ms.meetingCode(), 'KICK_PARTICIPANT', p.id).subscribe({
-      next: () => this.ms.showToast(`${p.firstName} đã bị xoá khỏi phòng`, 'success'),
-      error: () => this.ms.showToast('Không thể kick participant', 'error')
-    });
+    this.ms.requestKickParticipant(p.id, p.fullName || p.firstName);
   }
 
   getInitials(p: ParticipantDto): string {

@@ -49,8 +49,8 @@ export class HomeComponent {
   actionButtons = [
     { icon: 'video_call', label: 'New Meeting', color: 'orange', route: 'waiting-room' },
     { icon: 'add_box', label: 'Join', color: 'primary', route: 'waiting-room' },
-    { icon: 'calendar_month', label: 'Schedule', color: 'primary', route: null },
-    { icon: 'present_to_all', label: 'Share Screen', color: 'primary', route: null },
+    { icon: 'calendar_month', label: 'View Schedule', color: 'primary', route: '/scheduler' },
+    { icon: 'event_available', label: 'Schedule Meeting', color: 'primary', route: null },
   ];
 
   handleAction(btn: any) {

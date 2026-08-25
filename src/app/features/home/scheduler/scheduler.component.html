@@ -293,9 +293,10 @@
   <div class="detail-row detail-actions-row">
     <span class="material-symbols-outlined detail-row-icon">videocam</span>
     <div class="detail-btns">
-      <button class="detail-start-btn" (click)="startMeeting(selectedMeeting()!)">
+      <button class="detail-start-btn" (click)="startMeeting(selectedMeeting()!)"
+        [disabled]="false">
         <span class="material-symbols-outlined">play_arrow</span>
-        Start
+        {{ selectedMeeting()!.isHost ? 'Start' : 'Join' }}
       </button>
       <button class="detail-chat-btn">
         <span class="material-symbols-outlined">chat_bubble</span>
@@ -324,13 +325,32 @@
     <span class="material-symbols-outlined detail-row-icon">group</span>
     <div class="detail-invitees">
       <p class="detail-invitees-label">Invitees</p>
-      <div class="detail-invitee" *ngFor="let p of selectedMeeting()!.participants">
+      <div class="detail-invitee" *ngFor="let invitation of invitations()">
         <div class="invitee-avatar-wrap">
-          <img *ngIf="p.avatar" [src]="p.avatar" [alt]="p.name" class="invitee-avatar" />
-          <div *ngIf="!p.avatar" class="invitee-avatar-placeholder">{{ p.name.charAt(0) }}</div>
-          <span *ngIf="p.isHost" class="invitee-online-dot"></span>
+          <div class="invitee-avatar-placeholder">{{ invitation.inviteeEmail.charAt(0).toUpperCase() }}</div>
         </div>
-        <span class="invitee-name">{{ p.name }}{{ p.isHost ? ' (Host)' : '' }}</span>
+        <span class="invitee-name">{{ invitation.inviteeEmail }}</span>
+        <span class="invitation-status" [class.accepted]="invitation.status === 'ACCEPTED'">
+          {{ invitation.status | lowercase }}
+        </span>
+      </div>
+      <p class="no-invitees" *ngIf="selectedMeeting()!.isHost && invitations().length === 0">No invitees yet.</p>
+
+      <div class="invitee-editor" *ngIf="selectedMeeting()!.isHost && selectedMeeting()!.status === 'SCHEDULED'">
+        <div class="invitee-input-row" *ngFor="let invitee of inviteeInputs(); let index = index; trackBy: trackInviteeInput">
+          <input type="email" class="invitee-email-input" placeholder="name@example.com"
+            [ngModel]="invitee" (ngModelChange)="updateInviteeInput(index, $event)" />
+          <button type="button" class="invitee-icon-btn" (click)="addInviteeInput()" title="Add another invitee">
+            <span class="material-symbols-outlined">add</span>
+          </button>
+          <button type="button" class="invitee-icon-btn remove" *ngIf="inviteeInputs().length > 1"
+            (click)="removeInviteeInput(index)" title="Remove invitee">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <button type="button" class="send-invitees-btn" (click)="saveAdditionalInvitees()" [disabled]="isAddingInvitees()">
+          {{ isAddingInvitees() ? 'Sending…' : 'Invite' }}
+        </button>
       </div>
     </div>
   </div>
@@ -368,5 +388,7 @@
 <!-- Schedule Modal -->
 <app-schedule-modal
   *ngIf="isScheduleModalOpen()"
-  (close)="onMeetingCreated()">
+  mode="scheduled"
+  (close)="isScheduleModalOpen.set(false)"
+  (saved)="onMeetingCreated()">
 </app-schedule-modal>

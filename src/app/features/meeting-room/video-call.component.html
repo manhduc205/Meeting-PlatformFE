@@ -100,6 +100,7 @@
 
     <!-- Leave / End Modal (host only) -->
     <app-leave-modal *ngIf="ms.showLeaveModal()"></app-leave-modal>
+    <app-kick-confirm-modal *ngIf="ms.kickTarget()"></app-kick-confirm-modal>
 
   </ng-container>
 

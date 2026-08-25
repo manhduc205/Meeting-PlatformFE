@@ -9,7 +9,7 @@ export type HostSettingType = 'LOCK_MEETING' | 'WAITING_ROOM' | 'DISABLE_SCREEN_
 
 // ── Host Commands ─────────────────────────────────────────────────────────────
 /** command param for POST /api/v1/meetings/{meetingCode}/host/command */
-export type HostCommandType = 'MUTE_ALL' | 'KICK_PARTICIPANT';
+export type HostCommandType = 'MUTE_ALL' | 'MUTE_PARTICIPANT' | 'KICK_PARTICIPANT';
 
 // ── Raise Hand Participant ────────────────────────────────────────────────────
 /** A participant who has raised their hand — matches backend ParticipantDto */
@@ -28,11 +28,11 @@ export interface RaisedHandsResponse {
   participants: RaisedHandParticipant[];
 }
 
-// ── STOMP Topic: /topic/meeting.{meetingCode}.commands ────────────────────────
+// ── STOMP Topic: /topic/meeting.{meetingCode}.host-commands ───────────────────
 /** Payload pushed from backend on host command events */
 export interface HostCommandPayload {
-  action: 'MUTE_ALL' | 'KICK' | 'SETTING_CHANGED';
-  /** Present when action === 'KICK' */
+  action: 'MUTE_ALL' | 'MUTE_PARTICIPANT' | 'KICK_PARTICIPANT' | 'SETTING_CHANGED';
+  /** Present for participant-targeted commands */
   targetId?: string;
   /** Present when action === 'SETTING_CHANGED' */
   type?: HostSettingType;

@@ -43,6 +43,7 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
   copied = signal(false);
   private copyTimeout: any;
   private localStream: MediaStream | null = null;
+  private hasAutoJoined = false;
 
   microphones: MediaDeviceInfo[] = [];
   cameras: MediaDeviceInfo[] = [];
@@ -58,14 +59,19 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
   /** Internal user ID returned by the backend join API — used to match WS approval messages */
   private myInternalUserId: string | null = null;
 
-  constructor(private route: ActivatedRoute, private router: Router) {}
+  constructor(private route: ActivatedRoute, private router: Router) { }
 
   async ngOnInit() {
     this.route.queryParams.subscribe(async params => {
-      if (params['meetingId']) {
-        this.meetingId.set(params['meetingId']);
+      const meetingCode = params['meetingId'] ?? params['meetingCode'];
+      if (meetingCode) {
+        this.meetingId.set(meetingCode);
       }
       if (params['title']) this.meetingTitle.set(params['title']);
+      if (params['autoJoin'] === 'true' && meetingCode && !this.hasAutoJoined) {
+        this.hasAutoJoined = true;
+        queueMicrotask(() => this.joinMeeting());
+      }
     });
 
     await this.initDevices();
@@ -172,7 +178,9 @@ export class WaitingRoomComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Join meeting error:', err);
-        if (err.status === 401) {
+        const message = err.error?.message || 'Không thể tham gia cuộc họp.';
+        alert(message);
+        if (err.status === 401 || /password|mật khẩu/i.test(message)) {
           this.showPasswordField.set(true);
         }
         this.joinStatus.set('IDLE');

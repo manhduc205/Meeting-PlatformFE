@@ -12,7 +12,6 @@ import {
 } from '../models/meeting.types';
 import { ParticipantDto } from '../../../core/services/meeting.service';
 import { SignalingMessage } from './signaling.service';
-import { AuthService } from '../../../features/auth/auth.service';
 
 /** A single floating reaction particle on screen */
 export interface FloatingReaction {
@@ -26,7 +25,6 @@ export interface FloatingReaction {
 @Injectable({ providedIn: 'root' })
 export class MeetingActionService {
   private http = inject(HttpClient);
-  private auth = inject(AuthService);
   private readonly baseUrl = environment.backendApiUrl;
 
   // ── Internal Subject for raised-hand WebSocket events ─────────────────────
@@ -78,7 +76,10 @@ export class MeetingActionService {
   handleReactionFromWebSocket(message: SignalingMessage, participants: ParticipantDto[]): void {
     const senderId = message.senderId;
     const emoji = (message.payload?.['emoji'] as string) || '👍';
-    const localUserId = this.auth.getCurrentUser()?.id;
+    // senderId is the backend internal ID. Do not compare it with Keycloak's
+    // profile subject; get the matching internal ID from the authenticated
+    // sidebar response instead.
+    const localUserId = participants.find(p => p.isMe)?.id;
 
     // 1. Kiểm tra xem reaction có phải của chính mình không
     const isMe = !!localUserId && senderId === localUserId;

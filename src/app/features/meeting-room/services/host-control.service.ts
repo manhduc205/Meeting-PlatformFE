@@ -48,7 +48,7 @@ export class HostControlService {
 
   /**
    * POST /api/v1/meetings/{meetingCode}/host/command
-   * command: MUTE_ALL | KICK_PARTICIPANT
+   * command: MUTE_ALL | MUTE_PARTICIPANT | KICK_PARTICIPANT
    * Response: 200 OK (no body)
    */
   sendCommand(

@@ -1,8 +1,10 @@
 import { Component, inject, signal, OnInit, OnDestroy, HostListener, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../auth/auth.service';
 import { ScheduleModalComponent } from '../schedule-modal/schedule-modal.component';
+import { MeetingService, CalendarMeetingResponse, InvitationResponse } from '../../../core/services/meeting.service';
 
 export interface ScheduledMeeting {
   id: string;
@@ -17,17 +19,22 @@ export interface ScheduledMeeting {
   description?: string;
   participants?: { name: string; avatar?: string; isHost?: boolean }[];
   isMyMeeting: boolean;
+  isHost?: boolean;
+  status?: 'SCHEDULED' | 'IN_PROGRESS' | 'ENDED' | 'CANCELLED';
+  canStart?: boolean;
+  canJoin?: boolean;
 }
 
 @Component({
   selector: 'app-scheduler',
   standalone: true,
-  imports: [CommonModule, ScheduleModalComponent],
+  imports: [CommonModule, FormsModule, ScheduleModalComponent],
   templateUrl: './scheduler.component.html',
   styleUrls: ['./scheduler.component.scss']
 })
 export class SchedulerComponent implements OnInit, AfterViewInit, OnDestroy {
   private authService = inject(AuthService);
+  private meetingService = inject(MeetingService);
   private el = inject(ElementRef);
   router = inject(Router);
 
@@ -51,6 +58,9 @@ export class SchedulerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── Meeting detail panel ────────────────────────────────────
   selectedMeeting = signal<ScheduledMeeting | null>(null);
+  invitations = signal<InvitationResponse[]>([]);
+  inviteeInputs = signal<string[]>(['']);
+  isAddingInvitees = signal(false);
 
   // ── Meetings data ───────────────────────────────────────────
   scheduledMeetings = signal<ScheduledMeeting[]>([]);
@@ -59,8 +69,40 @@ export class SchedulerComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly pickerDayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   ngOnInit() {
-    this.loadMockMeetings();
+    this.loadMeetings();
     this.timeInterval = setInterval(() => this.currentTime.set(new Date()), 60000);
+  }
+
+  loadMeetings() {
+    const from = new Date(this.currentDate());
+    from.setMonth(from.getMonth() - 3);
+    const to = new Date(this.currentDate());
+    to.setMonth(to.getMonth() + 4);
+    this.meetingService.getCalendar(from.toISOString(), to.toISOString()).subscribe({
+      next: meetings => this.scheduledMeetings.set(meetings.map(meeting => this.toScheduledMeeting(meeting))),
+      error: error => console.error('Unable to load calendar meetings', error)
+    });
+  }
+
+  private toScheduledMeeting(meeting: CalendarMeetingResponse): ScheduledMeeting {
+    const isHost = meeting.isHost === true || meeting.role === 'HOST';
+    return {
+      id: meeting.id,
+      title: meeting.title,
+      startTime: meeting.plannedStartTime,
+      endTime: meeting.plannedEndTime,
+      hostId: meeting.hostId,
+      hostName: meeting.hostName,
+      hostAvatar: meeting.hostAvatarUrl,
+      meetingCode: meeting.meetingCode,
+      meetingUrl: `${location.origin}/waiting-room?meetingId=${meeting.meetingCode}`,
+      description: meeting.description,
+      isMyMeeting: isHost,
+      isHost,
+      status: meeting.status,
+      canStart: isHost || meeting.canStart,
+      canJoin: meeting.canJoin
+    };
   }
 
   ngAfterViewInit() {
@@ -442,18 +484,107 @@ export class SchedulerComponent implements OnInit, AfterViewInit, OnDestroy {
   openMeetingDetail(meeting: ScheduledMeeting, event: MouseEvent) {
     event.stopPropagation();
     this.selectedMeeting.set(meeting);
+    this.inviteeInputs.set(['']);
+    this.invitations.set([]);
+    if (meeting.isHost) this.loadInvitations(meeting.meetingCode);
   }
 
   closeMeetingDetail() {
     this.selectedMeeting.set(null);
+    this.invitations.set([]);
+  }
+
+  addInviteeInput() {
+    this.inviteeInputs.update(inputs => [...inputs, '']);
+  }
+
+  removeInviteeInput(index: number) {
+    this.inviteeInputs.update(inputs => inputs.length === 1 ? [''] : inputs.filter((_, currentIndex) => currentIndex !== index));
+  }
+
+  updateInviteeInput(index: number, value: string) {
+    this.inviteeInputs.update(inputs => inputs.map((input, currentIndex) => currentIndex === index ? value : input));
+  }
+
+  trackInviteeInput(index: number): number {
+    return index;
+  }
+
+  saveAdditionalInvitees() {
+    const meeting = this.selectedMeeting();
+    if (!meeting?.isHost) return;
+
+    const inviteeEmails = [...new Set(this.inviteeInputs()
+      .flatMap(value => value.split(/[\s,;]+/))
+      .map(email => email.trim().toLowerCase())
+      .filter(Boolean))];
+    if (!inviteeEmails.length) {
+      alert('Enter at least one invitee email.');
+      return;
+    }
+
+    this.isAddingInvitees.set(true);
+    this.meetingService.addInvitations(meeting.meetingCode, { inviteeEmails }).subscribe({
+      next: created => {
+        this.invitations.update(current => [...current, ...created]);
+        this.inviteeInputs.set(['']);
+        this.isAddingInvitees.set(false);
+      },
+      error: error => {
+        this.isAddingInvitees.set(false);
+        alert(error.error?.message || 'Unable to send invitations');
+      }
+    });
+  }
+
+  private loadInvitations(meetingCode: string) {
+    this.meetingService.getInvitations(meetingCode).subscribe({
+      next: invitations => this.invitations.set(invitations),
+      error: error => console.error('Unable to load invitations', error)
+    });
   }
 
   startMeeting(meeting: ScheduledMeeting) {
-    this.closeMeetingDetail();
-    this.router.navigate(['/waiting-room'], { queryParams: { title: meeting.title } });
+    const openWaitingRoom = (autoJoin = false) => {
+      this.closeMeetingDetail();
+      this.router.navigate(['/waiting-room'], {
+        queryParams: { meetingId: meeting.meetingCode, title: meeting.title, autoJoin: autoJoin || undefined }
+      });
+    };
+    if (!meeting.isHost) {
+      if (meeting.status !== 'IN_PROGRESS') {
+        alert('Cuộc họp chưa được Host bắt đầu. Vui lòng thử lại sau.');
+        return;
+      }
+      openWaitingRoom(true);
+      return;
+    }
+    if (meeting.status === 'IN_PROGRESS') {
+      this.joinHostedMeeting(meeting, openWaitingRoom);
+      return;
+    }
+    this.meetingService.startMeeting(meeting.meetingCode).subscribe({
+      next: () => this.joinHostedMeeting(meeting, openWaitingRoom),
+      error: error => alert(error.error?.message || 'Unable to start meeting')
+    });
+  }
+
+  private joinHostedMeeting(meeting: ScheduledMeeting, openWaitingRoom: () => void) {
+    this.meetingService.joinMeeting({ meetingCode: meeting.meetingCode }).subscribe({
+      next: response => {
+        if (response.status === 'APPROVED') {
+          this.closeMeetingDetail();
+          this.router.navigate(['/meeting-room'], { queryParams: { meetingId: meeting.meetingCode, title: meeting.title } });
+          return;
+        }
+        openWaitingRoom();
+      },
+      error: error => alert(error.error?.message || 'Unable to join the meeting')
+    });
   }
 
   onMeetingCreated() {
     this.isScheduleModalOpen.set(false);
+    this.loadMeetings();
   }
 }

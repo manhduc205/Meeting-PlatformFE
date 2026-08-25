@@ -17,14 +17,14 @@
     <div class="form-body">
       
       <!-- Date & Time Row -->
-      <div class="form-group datetime-group">
+      <div class="form-group datetime-group" *ngIf="mode === 'scheduled'">
         <div class="dt-row">
-          <label class="checkbox-label">
-            <input type="checkbox" [ngModel]="useStartTime()" (ngModelChange)="useStartTime.set($event)" />
-            <span class="checkmark"></span>
-          </label>
-          <input type="date" class="form-input dt-picker" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" [disabled]="!useStartTime()" />
-          <input type="time" class="form-input dt-picker" [ngModel]="startTime()" (ngModelChange)="startTime.set($event)" [disabled]="!useStartTime()" />
+          <input type="date" class="form-input dt-picker" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
+          <input type="time" class="form-input dt-picker" [ngModel]="startTime()" (ngModelChange)="startTime.set($event)" />
+        </div>
+        <div class="dt-row">
+          <input type="date" class="form-input dt-picker" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
+          <input type="time" class="form-input dt-picker" [ngModel]="endTime()" (ngModelChange)="endTime.set($event)" />
         </div>
         
         <div class="timezone-row">
@@ -46,8 +46,21 @@
 
       <!-- Invitees -->
       <div class="form-group">
-        <label class="group-label">Invitees</label>
-        <input type="text" class="form-input w-full" placeholder="Add invitees" />
+        <div class="invitees-label-row">
+          <label class="group-label">Invitees</label>
+          <button type="button" class="add-invitee-btn" (click)="addInviteeInput()" title="Add another invitee">
+            <span class="material-symbols-outlined">add</span>
+            Add invitee
+          </button>
+        </div>
+        <div class="invitee-input-row" *ngFor="let invitee of inviteeInputs(); let index = index; trackBy: trackInviteeInput">
+          <input type="email" class="form-input w-full" placeholder="name@example.com"
+            [ngModel]="invitee" (ngModelChange)="updateInviteeInput(index, $event)" />
+          <button type="button" class="remove-invitee-btn" *ngIf="inviteeInputs().length > 1"
+            (click)="removeInviteeInput(index)" title="Remove invitee">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
       </div>
 
       <!-- Security -->
@@ -83,7 +96,7 @@
     <div class="modal-footer">
       <a href="#" class="more-options-link" (click)="$event.preventDefault()">More Options</a>
       <button class="save-btn" (click)="saveMeeting()" [disabled]="isSaving()">
-        <span *ngIf="!isSaving()">Save</span>
+        <span *ngIf="!isSaving()">{{ mode === 'instant' ? 'Create & Start' : 'Schedule meeting' }}</span>
         <span *ngIf="isSaving()" class="spinner"></span>
       </button>
     </div>

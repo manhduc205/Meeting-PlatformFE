@@ -30,7 +30,17 @@ export interface JoinMeetingResponse {
 export interface MeetingCreateRequest {
   title: string;
   description?: string;
-  startTime?: string | null;
+  plannedStartTime: string;
+  plannedEndTime: string;
+  inviteeEmails?: string[];
+  meetingPassword?: string;
+  isWaitingRoomEnabled?: boolean;
+}
+
+export interface InstantMeetingCreateRequest {
+  title: string;
+  description?: string;
+  inviteeEmails?: string[];
   meetingPassword?: string;
   isWaitingRoomEnabled?: boolean;
 }
@@ -42,7 +52,10 @@ export interface MeetingCreateResponse {
   description: string;
   hostId: string;
   status: string;
-  startTime: string;
+  plannedStartTime: string;
+  plannedEndTime: string;
+  startedAt?: string;
+  endedAt?: string;
   isWaitingRoomEnabled: boolean;
   createdAt: string;
 }
@@ -60,7 +73,37 @@ export interface MeetingResponse {
   meetingCode: string;
   title: string;
   status: string;
-  endTime?: string;
+  plannedEndTime?: string;
+}
+
+export interface CalendarMeetingResponse {
+  id: string;
+  meetingCode: string;
+  title: string;
+  description?: string;
+  hostId: string;
+  hostName?: string;
+  hostAvatarUrl?: string;
+  plannedStartTime: string;
+  plannedEndTime: string;
+  status: 'SCHEDULED' | 'IN_PROGRESS' | 'ENDED' | 'CANCELLED';
+  isHost?: boolean;
+  role: 'HOST' | 'GUEST';
+  invitationStatus?: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+  canStart: boolean;
+  canJoin: boolean;
+}
+
+export interface InvitationResponse {
+  id: string;
+  inviteeEmail: string;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+  respondedAt?: string;
+  createdAt: string;
+}
+
+export interface InvitationCreateRequest {
+  inviteeEmails: string[];
 }
 
 // ── Waiting Room ──────────────────────────────────────────────────────────────
@@ -106,7 +149,31 @@ export class MeetingService {
   }
 
   createMeeting(request: MeetingCreateRequest): Observable<MeetingCreateResponse> {
-    return this.http.post<MeetingCreateResponse>(`${this.apiUrl}/create`, request);
+    return this.http.post<MeetingCreateResponse>(this.apiUrl, request);
+  }
+
+  createInstantMeeting(request: InstantMeetingCreateRequest): Observable<MeetingCreateResponse> {
+    return this.http.post<MeetingCreateResponse>(`${this.apiUrl}/instant`, request);
+  }
+
+  getCalendar(from: string, to: string): Observable<CalendarMeetingResponse[]> {
+    return this.http.get<CalendarMeetingResponse[]>(`${environment.backendApiUrl}/api/v1/me/calendar`, { params: { from, to } });
+  }
+
+  getUpcoming(limit = 10): Observable<CalendarMeetingResponse[]> {
+    return this.http.get<CalendarMeetingResponse[]>(`${environment.backendApiUrl}/api/v1/me/upcoming`, { params: { limit } });
+  }
+
+  startMeeting(meetingCode: string): Observable<MeetingCreateResponse> {
+    return this.http.post<MeetingCreateResponse>(`${this.apiUrl}/${meetingCode}/start`, {});
+  }
+
+  getInvitations(meetingCode: string): Observable<InvitationResponse[]> {
+    return this.http.get<InvitationResponse[]>(`${this.apiUrl}/${meetingCode}/invitations`);
+  }
+
+  addInvitations(meetingCode: string, request: InvitationCreateRequest): Observable<InvitationResponse[]> {
+    return this.http.post<InvitationResponse[]>(`${this.apiUrl}/${meetingCode}/invitations`, request);
   }
 
   // ── Waiting Room (Host only) ───────────────────────────────────────────────

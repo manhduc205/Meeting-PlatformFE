@@ -13,6 +13,7 @@ import {
   VideoPresets,
   RoomConnectOptions,
   ConnectionQuality,
+  DisconnectReason,
 } from 'livekit-client';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
@@ -120,6 +121,12 @@ export class MediaStreamService {
   private _localStream$ = new BehaviorSubject<MediaStream | null>(null);
   private _screenShareStream$ = new BehaviorSubject<MediaStream | null>(null);
   private _dataReceived$ = new Subject<{ payload: DataPayload; participantIdentity: string }>();
+  /**
+   * Server-authoritative exits. This is deliberately separate from `connected$`:
+   * temporary network loss must use LiveKit's reconnect policy, while an explicit
+   * RemoveParticipant/DeleteRoom must immediately leave the meeting UI.
+   */
+  private _serverExit$ = new Subject<'removed' | 'meeting-ended'>();
 
   /**
    * isMicEnabled$ / isCameraEnabled$: Updated by every LiveKit event.
@@ -143,6 +150,7 @@ export class MediaStreamService {
   readonly localStream$ = this._localStream$.asObservable();
   readonly screenShareStream$ = this._screenShareStream$.asObservable();
   readonly dataReceived$ = this._dataReceived$.asObservable();
+  readonly serverExit$ = this._serverExit$.asObservable();
   readonly isMicEnabled$ = this._isMicEnabled$.asObservable();
   readonly isCameraEnabled$ = this._isCameraEnabled$.asObservable();
   readonly isScreenSharing$ = this._isScreenSharing$.asObservable();
@@ -176,17 +184,6 @@ export class MediaStreamService {
       throw new Error(`Backend returned ${joinInfo.mode} mode — SFU token unavailable`);
     }
 
-    // ── Fallback: nếu backend trả về URL nội bộ Docker (vd: ws://livekit:7880),
-    //    override bằng public URL từ environment để tránh ERR_NAME_NOT_RESOLVED
-    const isInternalUrl = !joinInfo.serverUrl.includes('.');
-    if (isInternalUrl) {
-      console.warn(
-        `[MediaStream] Backend returned internal serverUrl "${joinInfo.serverUrl}", ` +
-        `overriding with environment.livekitUrl: "${environment.livekitUrl}"`
-      );
-      joinInfo.serverUrl = environment.livekitUrl;
-    }
-
     // ── 3. Tear down any previous room (idempotent) ───────────────────────
     if (this.room) {
       this.room.removeAllListeners();
@@ -200,6 +197,16 @@ export class MediaStreamService {
     // ── 5. Connect with timeout guard ────────────────────────────────────
     const connectOptions: RoomConnectOptions = {
       autoSubscribe: true,
+      rtcConfig: {
+        iceServers: [
+          { urls: joinInfo.iceServers.stunUrl },
+          {
+            urls: joinInfo.iceServers.turnUrl,
+            username: joinInfo.iceServers.username,
+            credential: joinInfo.iceServers.credential,
+          },
+        ].filter(server => !!server.urls),
+      },
     };
 
     await Promise.race([
@@ -265,6 +272,11 @@ export class MediaStreamService {
     });
     this._syncLocalState();
     this._syncParticipants();
+  }
+
+  supportsScreenShare(): boolean {
+    return typeof navigator !== 'undefined' &&
+      typeof navigator.mediaDevices?.getDisplayMedia === 'function';
   }
 
   // ─── DataChannel: Reactions ───────────────────────────────────────────────
@@ -422,9 +434,18 @@ export class MediaStreamService {
         console.info('[MediaStream] Room reconnected successfully');
       })
 
-      .on(RoomEvent.Disconnected, () => {
+      .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
         this._connected$.next(false);
         this._reconnecting$.next(false);
+
+        // The media server is the fallback source of truth when STOMP is
+        // unavailable. LiveKit sends these exact reasons for the server APIs
+        // used by host kick/end-meeting actions.
+        if (reason === DisconnectReason.PARTICIPANT_REMOVED) {
+          this._serverExit$.next('removed');
+        } else if (reason === DisconnectReason.ROOM_DELETED) {
+          this._serverExit$.next('meeting-ended');
+        }
       })
 
       // ── DataChannel ───────────────────────────────────────────────────────

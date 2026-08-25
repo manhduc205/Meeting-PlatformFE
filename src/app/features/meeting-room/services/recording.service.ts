@@ -11,7 +11,7 @@ export class RecordingService {
 
   startRecording(meetingCode: string): Observable<RecordingResponse> {
     return this.http.post<RecordingResponse>(
-      `${this.base}/api/v1/meetings/${meetingCode}/recordings/start`,
+      `${this.base}/api/v1/recordings/meeting/${meetingCode}/start`,
       null
     ).pipe(
       map(rec => this.mapRecording(rec))
@@ -20,15 +20,15 @@ export class RecordingService {
 
   stopRecording(meetingCode: string, egressId: string): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/api/v1/meetings/${meetingCode}/recordings/${egressId}/stop`,
+      `${this.base}/api/v1/recordings/meeting/${meetingCode}/stop`,
       null,
-      { responseType: 'text' as 'json' }
+      { params: { egressId }, responseType: 'text' as 'json' }
     );
   }
 
   getRecordings(meetingCode: string): Observable<RecordingResponse[]> {
     return this.http.get<RecordingResponse[]>(
-      `${this.base}/api/v1/meetings/${meetingCode}/recordings`
+      `${this.base}/api/v1/recordings/meeting/${meetingCode}`
     ).pipe(
       map(recs => this.mapRecordings(recs))
     );

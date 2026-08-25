@@ -1,8 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ScheduleModalComponent } from '../schedule-modal/schedule-modal.component';
 import { JoinMeetingModalComponent } from '../join-meeting-modal/join-meeting-modal.component';
+import { MeetingService } from '../../../core/services/meeting.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -11,24 +12,30 @@ import { JoinMeetingModalComponent } from '../join-meeting-modal/join-meeting-mo
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit {
+  private meetingService = inject(MeetingService);
   constructor(public router: Router) {}
 
   isScheduleModalOpen = false;
+  isInstantMeetingModalOpen = false;
   isJoinModalOpen = false;
   actionButtons = [
     { icon: 'video_call', label: 'New Meeting', color: 'orange', route: null },
     { icon: 'add_box', label: 'Join', color: 'primary', route: null },
-    { icon: 'calendar_month', label: 'Schedule', color: 'primary', route: null },
-    { icon: 'present_to_all', label: 'Share Screen', color: 'primary', route: null },
+    { icon: 'calendar_month', label: 'View Schedule', color: 'primary', route: null },
+    { icon: 'event_available', label: 'Schedule Meeting', color: 'primary', route: null },
   ];
   handleAction(btn: any) {
     if (btn.label === 'New Meeting') {
-      this.isScheduleModalOpen = true;
+      this.isInstantMeetingModalOpen = true;
       return;
     }
-    if (btn.label === 'Schedule') {
+    if (btn.label === 'View Schedule') {
       this.router.navigate(['/scheduler']);
+      return;
+    }
+    if (btn.label === 'Schedule Meeting') {
+      this.isScheduleModalOpen = true;
       return;
     }
     if (btn.label === 'Join') {
@@ -51,41 +58,67 @@ export class DashboardComponent {
     { icon: 'group_add', label: 'Invite Team', sub: 'Invite new members to workspace', bg: 'purple' },
   ];
 
-  meetings = [
-    {
-      month: 'Oct',
-      day: '24',
-      title: 'Product Strategy Sync',
-      time: '10:00 AM - 11:00 AM',
-      active: true,
-      action: 'Start',
-      avatars: [
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuDk6LGZfQUpzZ9Anb489kuqg-6gUQYzOtH8_zEzMS2HEaVa39Toy9cnUpKwJzOclXrLjfYkcNWxEpGKnJWCnXKXCJUYoDiE9ET4d9XEfgzg8sekBleDW0UVP09rpi-ofe1jwY-rfhasmp2SpSeoE70IJvnNYUXZES6kLNSTxJtQmpEUVuPrL5N_U2tLah309ysDipZG2GiFoquL4VJF5AxE0IQohkm0o8c8IM1-rXNgNZ4z-WPhAvmQUa5cMywytd0isxu7j3kjuvM',
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuCXhy8omsnfqJma8lCAfmGG6JbbXiqMfgMw5a8bi7JTUdsLMwUqHcBpV40Y2KwtbZ2QXkk5pMbelyxaJoGrjJxAXYpzml3pU3mrriamPsFQucu6LZNHXKfrC_vrj6cdUz1bgMGRbr8R2V6jVVJ7IOLD4XqdPks1ie3OtxR39CMdj6W30BWvYVwtcv5MNIx1cZl8hIv5L92UHp01jvnLCs2UojV3eaupMrkuu31H_wiNES7J1MfTunTvPX7JTBKV2KTqtb43gnnN7a8'
-      ],
-      extra: '+4'
-    },
-    {
-      month: 'Oct',
-      day: '24',
-      title: 'Weekly Design Review',
-      time: '01:30 PM - 02:30 PM',
-      active: false,
-      action: 'Join',
-      avatars: [
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuDYYbNUICIfsFRmkSK3n3JRCz9_UmiIh9TQdHRn4rgCen7vdG9dYFN-iK2ZU_FS6jbzDSqy1qTRZHgCcvpZs9evoSl_6aImXmZzBT4L_VTDSUlsSZfkXP5aKdzDjTZb1GXoWpi47NEd7SlSxDxzqOf_VgoRvDZNoohDT7HKjhCrI2FqFr5t7w0ldfEYE-YH8IZN8Hs8jgg6YBX4HtFSEBYEXWKX96soss4cwfvKQN46EDkwpUCpfTwvUorGQvwNMnICWEYu4ClBKnE'
-      ],
-      extra: '+2'
-    },
-    {
-      month: 'Oct',
-      day: '25',
-      title: 'Marketing Workshop',
-      time: '11:00 AM - 12:30 PM',
-      active: false,
-      action: null,
-      avatars: [],
-      extra: null
+  meetings: any[] = [];
+
+  ngOnInit() {
+    this.meetingService.getUpcoming(3).subscribe({
+      next: meetings => this.meetings = meetings.map(meeting => {
+        const start = new Date(meeting.plannedStartTime);
+        const end = new Date(meeting.plannedEndTime);
+        const isHost = meeting.isHost === true || meeting.role === 'HOST';
+        return {
+          month: start.toLocaleString('en-US', { month: 'short' }),
+          day: start.getDate(),
+          title: meeting.title,
+          time: `${start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`,
+          // A host always owns the Start action.  This includes instant meetings,
+          // which are already IN_PROGRESS and therefore cannot be "started" again.
+          active: isHost || meeting.canJoin,
+          action: isHost ? 'Start' : meeting.canJoin ? 'Join' : null,
+          meetingCode: meeting.meetingCode,
+          status: meeting.status,
+          isHost,
+          avatars: [],
+          extra: null
+        };
+      }),
+      error: error => console.error('Unable to load upcoming meetings', error)
+    });
+  }
+
+  onInstantMeetingCreated(meeting: { meetingCode: string; title: string }) {
+    this.isInstantMeetingModalOpen = false;
+    this.joinHostedMeeting(meeting);
+  }
+
+  openUpcoming(meeting: any) {
+    if (meeting.isHost) {
+      if (meeting.status === 'IN_PROGRESS') {
+        this.joinHostedMeeting(meeting);
+        return;
+      }
+      this.meetingService.startMeeting(meeting.meetingCode).subscribe({
+        next: () => this.joinHostedMeeting(meeting),
+        error: error => alert(error.error?.message || 'Unable to start meeting')
+      });
+      return;
     }
-  ];
+    if (meeting.status !== 'IN_PROGRESS') {
+      alert('Cuộc họp chưa được Host bắt đầu. Vui lòng thử lại sau.');
+      return;
+    }
+    this.router.navigate(['/waiting-room'], {
+      queryParams: { meetingId: meeting.meetingCode, title: meeting.title, autoJoin: true }
+    });
+  }
+
+  private joinHostedMeeting(meeting: { meetingCode: string; title: string }) {
+    this.meetingService.joinMeeting({ meetingCode: meeting.meetingCode }).subscribe({
+      next: response => {
+        const destination = response.status === 'APPROVED' ? '/meeting-room' : '/waiting-room';
+        this.router.navigate([destination], { queryParams: { meetingId: meeting.meetingCode, title: meeting.title } });
+      },
+      error: error => alert(error.error?.message || 'Unable to join meeting')
+    });
+  }
 }

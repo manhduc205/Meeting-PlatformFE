@@ -63,7 +63,8 @@ export class SignalingService {
   async connect(meetingCode: string, senderId: string): Promise<void> {
     let currentToken = await this.authService.getToken();
 
-    this.client = new Client({
+    await new Promise<void>((resolve, reject) => {
+      this.client = new Client({
       brokerURL: `${environment.backendApiUrl.replace('http', 'ws')}/ws/meeting/websocket`,
       connectHeaders: {
         Authorization: `Bearer ${currentToken}`
@@ -88,11 +89,20 @@ export class SignalingService {
       onConnect: () => {
         this._connected$.next(true);
         this._subscribe(meetingCode, senderId);
+        resolve();
       },
       onDisconnect: () => this._connected$.next(false),
-      onStompError: (frame) => console.error('[STOMP] error', frame),
+      onStompError: (frame) => {
+        console.error('[STOMP] error', frame);
+        reject(new Error(frame.headers['message'] || 'STOMP connection failed'));
+      },
+      onWebSocketError: (event) => {
+        console.error('[STOMP] WebSocket error', event);
+        reject(new Error('WebSocket connection failed'));
+      },
+      });
+      this.client.activate();
     });
-    this.client.activate();
   }
 
   private _subscribe(meetingCode: string, senderId: string): void {
@@ -114,7 +124,7 @@ export class SignalingService {
     // ── Host Commands topic ───────────────────────────────────────────────────
     // Payload: { action: 'MUTE_ALL' | 'KICK' | 'SETTING_CHANGED', ... }
     const cmdSub = this.client.subscribe(
-      `/topic/meeting.${meetingCode}.commands`,
+      `/topic/meeting.${meetingCode}.host-commands`,
       (msg: IMessage) => {
         try {
           const payload = JSON.parse(msg.body) as HostCommandPayload;

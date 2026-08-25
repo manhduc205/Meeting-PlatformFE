@@ -75,7 +75,7 @@
           <button *ngIf="m.action" class="meeting-action-btn"
             [class.primary-btn]="m.active"
             [class.outline-btn]="!m.active"
-            (click)="router.navigate(['/waiting-room'], { queryParams: { title: m.title } })">
+            (click)="openUpcoming(m)">
             {{ m.action }}
           </button>
         </div>
@@ -97,5 +97,11 @@
   </div>
 </div>
 
-<app-schedule-modal *ngIf="isScheduleModalOpen" (close)="isScheduleModalOpen = false"></app-schedule-modal>
+<app-schedule-modal *ngIf="isScheduleModalOpen" mode="scheduled" (close)="isScheduleModalOpen = false"></app-schedule-modal>
+<app-schedule-modal
+  *ngIf="isInstantMeetingModalOpen"
+  mode="instant"
+  (saved)="onInstantMeetingCreated($event)"
+  (close)="isInstantMeetingModalOpen = false">
+</app-schedule-modal>
 <app-join-meeting-modal *ngIf="isJoinModalOpen" (close)="isJoinModalOpen = false"></app-join-meeting-modal>

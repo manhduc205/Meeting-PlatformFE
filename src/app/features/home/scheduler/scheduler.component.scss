@@ -948,6 +948,80 @@ $hour-h: 44px;   // compact: 44px/giờ (≈ Google Calendar compact mode)
   margin-bottom: 8px;
 }
 
+.invitation-status {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  text-transform: capitalize;
+
+  &.accepted { color: #15803d; }
+}
+
+.no-invitees {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.invitee-editor {
+  border-top: 1px solid #e2e8f0;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.invitee-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.invitee-email-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+
+  &:focus { border-color: $primary; box-shadow: 0 0 0 3px rgba($primary, 0.1); }
+}
+
+.invitee-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: $primary;
+  cursor: pointer;
+
+  .material-symbols-outlined { font-size: 18px; }
+  &:hover { background: #eff6ff; }
+  &.remove { color: #94a3b8; &:hover { color: #dc2626; background: #fef2f2; } }
+}
+
+.send-invitees-btn {
+  border: 0;
+  border-radius: 7px;
+  background: $primary;
+  color: #fff;
+  padding: 7px 13px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:disabled { opacity: 0.65; cursor: wait; }
+}
+
 .invitee-avatar-wrap {
   position: relative;
   flex-shrink: 0;

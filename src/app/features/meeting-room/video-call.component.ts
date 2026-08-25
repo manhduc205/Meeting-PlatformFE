@@ -14,6 +14,7 @@ import { HostToolsPanelComponent } from './components/host-tools-panel/host-tool
 import { RaisedHandsPanelComponent } from './components/raised-hands-panel/raised-hands-panel.component';
 import { KnockNotificationsComponent } from './components/knock-notifications/knock-notifications.component';
 import { LeaveModalComponent } from './components/leave-modal/leave-modal.component';
+import { KickConfirmModalComponent } from './components/kick-confirm-modal/kick-confirm-modal.component';
 
 @Component({
   selector: 'app-video-call',
@@ -31,6 +32,7 @@ import { LeaveModalComponent } from './components/leave-modal/leave-modal.compon
     RaisedHandsPanelComponent,
     KnockNotificationsComponent,
     LeaveModalComponent,
+    KickConfirmModalComponent,
   ],
   templateUrl: './video-call.component.html',
   styleUrls: ['./video-call.component.scss']
@@ -68,4 +70,3 @@ export class VideoCallComponent implements OnInit, OnDestroy {
     this.router.navigate(['/']);
   }
 }
-

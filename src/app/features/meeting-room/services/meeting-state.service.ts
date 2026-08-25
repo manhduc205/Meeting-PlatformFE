@@ -81,6 +81,9 @@ export class MeetingStateService {
   showRaisedHands = signal(false);      // Raised Hands panel visibility
   hasLeft = signal(false);
   showLeaveModal = signal(false);  // drives leave-modal visibility
+  /** Target selected by the host; the API is called only after modal confirmation. */
+  kickTarget = signal<{ id: string; name: string } | null>(null);
+  isKickingParticipant = signal(false);
   toastMessage = signal<{ text: string; type: 'info' | 'success' | 'error' } | null>(null);
   localStream = signal<MediaStream | null>(null);
 
@@ -122,8 +125,10 @@ export class MeetingStateService {
     const user = this.auth.getCurrentUser();
     if (!user) return null;
 
-    // Look up avatar + full name from backend participant list for the local user
-    const beInfo = this.backendParticipants().find(p => p.id === user.id);
+    // `User.id` is Keycloak's subject while ParticipantDto.id is the internal
+    // application UUID/LiveKit identity. `isMe` is computed by the backend from
+    // the authenticated request and is the only safe bridge between the two.
+    const beInfo = this.backendParticipants().find(p => p.isMe);
 
     // Avatar URL with multi-level fallback (backend → Keycloak picture → undefined)
     const rawAvatarUrl = beInfo?.avatarUrl ?? user.picture ?? undefined;
@@ -227,7 +232,19 @@ export class MeetingStateService {
     }
 
     try {
-      this.signaling.connect(code, user.id);
+      // Every path into the meeting room, including the creator's direct route,
+      // must register with the backend before connecting to LiveKit. Repeated
+      // calls are idempotent for an already-approved participant.
+      const joinResult = await firstValueFrom(
+        this.meetingService.joinMeeting({ meetingCode: code })
+      );
+      if (joinResult.status !== 'APPROVED') {
+        this.connectionState.set('error');
+        this.showToast('Bạn chưa được duyệt vào cuộc họp', 'error');
+        return;
+      }
+
+      await this.signaling.connect(code, user.id);
       await this.media.connect(code);
       this.connectionState.set('connected');
 
@@ -244,24 +261,6 @@ export class MeetingStateService {
           }
         },
         error: (err: any) => console.error('[Host] getSidebarParticipants failed:', err)
-      });
-
-      // ── Strategy 2: Probe waiting-room API directly — if 200, user is the host
-      // This fires independently of Strategy 1, so even if sidebar isMe is null,
-      // the host UI still appears.
-      this.meetingService.getWaitingRoom(code).subscribe({
-        next: (list) => {
-          console.log('[Host] Waiting room probe SUCCESS → user IS host. List:', list);
-          this.waitingParticipants.set(list);
-          if (!this.isHost()) {
-            this.isHost.set(true);
-            this._startWaitingRoomPolling();
-          }
-        },
-        error: (err: any) => {
-          // 403 = not host, any other error = network issue
-          console.log('[Host] Waiting room probe result (403 = not host):', err?.status, err?.message);
-        }
       });
 
     } catch (e) {
@@ -324,6 +323,17 @@ export class MeetingStateService {
       })
     );
 
+    // LiveKit is the authoritative fallback for host actions. If STOMP is
+    // disconnected or delayed, RemoveParticipant/DeleteRoom still ejects the
+    // affected browser immediately instead of leaving a frozen meeting screen.
+    this.subs.add(
+      this.media.serverExit$.subscribe(exit => {
+        this._leaveBecauseServerEnded(exit === 'removed'
+          ? '⚠️ You have been removed from the meeting'
+          : 'The host has ended the meeting');
+      })
+    );
+
     // ── DataChannel messages ──────────────────────────────────────────────
     this.subs.add(
       this.media.dataReceived$.subscribe(({ payload, participantIdentity }) => {
@@ -352,9 +362,7 @@ export class MeetingStateService {
           this.meetingAction.handleReactionFromWebSocket(msg, this.backendParticipants());
         }
         if (msg.type === 'MEETING_ENDED') {
-          this.showToast('The host has ended the meeting', 'info');
-          this.cleanupMedia();
-          this.router.navigate(['/']);
+          this._leaveBecauseServerEnded('The host has ended the meeting');
         }
       })
     );
@@ -374,7 +382,6 @@ export class MeetingStateService {
                 this.loadWaitingRoom();
                 this._startWaitingRoomPolling();
               } else if (!isHost && this.isHost()) {
-                // Edge case: host role revoked
                 this.isHost.set(false);
                 this._stopWaitingRoomPolling();
               }
@@ -695,7 +702,10 @@ export class MeetingStateService {
   }
 
   private _handleHostCommand(cmd: import('../models/meeting.types').HostCommandPayload): void {
-    const myUserId = this.auth.getCurrentUser()?.id;
+    // Host commands target the internal application UUID, which is also the
+    // LiveKit identity. Keycloak's `sub` (`auth.getCurrentUser().id`) is a
+    // different identifier, so use the backend-provided isMe bridge.
+    const myUserId = this.backendParticipants().find(participant => participant.isMe)?.id;
 
     switch (cmd.action) {
       case 'MUTE_ALL': {
@@ -707,13 +717,18 @@ export class MeetingStateService {
         break;
       }
 
-      case 'KICK': {
+      case 'MUTE_PARTICIPANT': {
+        if (cmd.targetId === myUserId) {
+          this.isMuted.set(true);
+          this.media.setMicEnabled(false);
+          this.showToast('🔇 The host has muted you', 'info');
+        }
+        break;
+      }
+
+      case 'KICK_PARTICIPANT': {
         if (cmd.targetId && cmd.targetId === myUserId) {
-          this.showToast('⚠️ You have been removed from the meeting', 'error');
-          this.cleanupMedia().then(() => {
-            this.hasLeft.set(true);
-            this.router.navigate(['/']);
-          });
+          this._leaveBecauseServerEnded('⚠️ You have been removed from the meeting');
         }
         break;
       }
@@ -723,6 +738,22 @@ export class MeetingStateService {
         break;
       }
     }
+  }
+
+  /** Idempotent exit path shared by STOMP and the LiveKit server fallback. */
+  private _serverExitInProgress = false;
+
+  private _leaveBecauseServerEnded(message: string): void {
+    if (this._serverExitInProgress || this.hasLeft()) return;
+
+    this._serverExitInProgress = true;
+    this.showToast(message, 'error');
+    void this.cleanupMedia().finally(() => {
+      this.hasLeft.set(true);
+      this.showLeaveModal.set(false);
+      this.router.navigate(['/']);
+      this._serverExitInProgress = false;
+    });
   }
 
   // ── Controls — Optimistic update + SDK call + rollback on error ───────────
@@ -782,11 +813,19 @@ export class MeetingStateService {
   async toggleScreenShare(): Promise<void> {
     const wasSharing = this.isScreenSharing();
     const nextSharing = !wasSharing;
+    if (nextSharing && !this.media.supportsScreenShare()) {
+      this.showToast('Trình duyệt trên thiết bị này chưa hỗ trợ chia sẻ màn hình', 'error');
+      return;
+    }
     try {
       await this.media.setScreenShareEnabled(nextSharing);
       this.showToast(nextSharing ? 'Screen sharing started' : 'Screen sharing stopped', 'info');
-    } catch {
-      // Screen share cancelled by user (rejected picker) — not an error
+    } catch (error) {
+      const name = error instanceof DOMException ? error.name : '';
+      if (name !== 'AbortError' && name !== 'NotAllowedError') {
+        console.error('[Meeting] Screen share failed', error);
+        this.showToast('Không thể chia sẻ màn hình trên thiết bị hoặc mạng hiện tại', 'error');
+      }
     }
   }
 
@@ -857,6 +896,35 @@ export class MeetingStateService {
     // Gọi API /leave để backend cập nhật trạng thái
     this.meetingService.leaveMeeting(code).subscribe({
       error: (err: any) => console.warn('[Meeting] leaveMeeting API error:', err)
+    });
+  }
+
+  // ── Host participant removal ────────────────────────────────────────────
+
+  requestKickParticipant(targetId: string, targetName: string): void {
+    if (!this.isHost() || !targetId || this.isKickingParticipant()) return;
+    this.kickTarget.set({ id: targetId, name: targetName || 'người tham gia này' });
+  }
+
+  cancelKickParticipant(): void {
+    if (!this.isKickingParticipant()) this.kickTarget.set(null);
+  }
+
+  confirmKickParticipant(): void {
+    const target = this.kickTarget();
+    if (!target || !this.isHost() || this.isKickingParticipant()) return;
+
+    this.isKickingParticipant.set(true);
+    this.hostControl.sendCommand(this.meetingCode(), 'KICK_PARTICIPANT', target.id).subscribe({
+      next: () => {
+        this.showToast(`Đã loại ${target.name} khỏi phòng`, 'success');
+        this.kickTarget.set(null);
+        this.isKickingParticipant.set(false);
+      },
+      error: () => {
+        this.showToast(`Không thể loại ${target.name} khỏi phòng`, 'error');
+        this.isKickingParticipant.set(false);
+      },
     });
   }
 

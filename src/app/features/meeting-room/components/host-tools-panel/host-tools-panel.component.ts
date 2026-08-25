@@ -444,18 +444,8 @@ export class HostToolsPanelComponent {
   }
 
   removeParticipant(p: Participant) {
-    this.loading.set(true);
-    this.hostControl.sendCommand(this.ms.meetingCode(), 'KICK_PARTICIPANT', p.id).subscribe({
-      next: () => {
-        this.ms.showToast(`${p.name} has been removed from the meeting`, 'error');
-        this.section.set('main');
-        this.loading.set(false);
-      },
-      error: () => {
-        this.ms.showToast(`Failed to remove ${p.name}`, 'error');
-        this.loading.set(false);
-      },
-    });
+    this.ms.requestKickParticipant(p.id, p.name);
+    this.section.set('main');
   }
 
   // ── Spotlight (local only — no API) ───────────────────────────────────────

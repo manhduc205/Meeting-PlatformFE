@@ -106,6 +106,45 @@ $bg-hover: #f3f4f6;
   color: $text-main;
 }
 
+.invitees-label-row,
+.invitee-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invitees-label-row {
+  justify-content: space-between;
+}
+
+.add-invitee-btn,
+.remove-invitee-btn {
+  border: 0;
+  background: transparent;
+  color: $primary;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.add-invitee-btn {
+  font-size: 13px;
+  font-weight: 600;
+
+  .material-symbols-outlined { font-size: 17px; }
+}
+
+.remove-invitee-btn {
+  color: #94a3b8;
+  padding: 6px;
+  border-radius: 50%;
+
+  &:hover { background: #f1f5f9; color: #ef4444; }
+  .material-symbols-outlined { font-size: 18px; }
+}
+
 .form-input {
   border: 1px solid $border;
   border-radius: 8px;
