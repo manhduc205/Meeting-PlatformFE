@@ -1,237 +1,185 @@
-import { Component, OnInit, signal, inject, computed } from '@angular/core';
+import { Component, OnInit, signal, inject, computed, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { Router, ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { RecordingService } from '../../meeting-room/services/recording.service';
-import { RecordingResponse } from '../../meeting-room/models/recording.model';
-
-interface TranscriptLine {
-  time: string;
-  text: string;
-}
-
-interface ChatMessage {
-  role: 'user' | 'ai';
-  text: string;
-}
+import { AiContentStatus, RecordingDetailResponse, TranscriptSegment } from '../../meeting-room/models/recording.model';
 
 @Component({
-  selector: 'app-recording-detail',
-  standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
-  templateUrl: './recording-detail.component.html',
-  styleUrls: ['./recording-detail.component.scss']
+  selector: 'app-recording-detail', standalone: true, imports: [CommonModule, RouterModule],
+  templateUrl: './recording-detail.component.html', styleUrls: ['./recording-detail.component.scss']
 })
 export class RecordingDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private recordingService = inject(RecordingService);
   constructor(public router: Router) {}
 
-  isPlaying = signal(false);
-  isStarred = signal(false);
-  progressPct = signal(35);
-  activeTab = signal<'summary' | 'aichat'>('summary');
-  chatMessages = signal<ChatMessage[]>([]);
-  chatInput = '';
-
-  isLoading = signal(false);
-  errorMessage = signal<string | null>(null);
-  recordingData = signal<RecordingResponse | null>(null);
-
-  copyToastVisible = signal(false);
+  @ViewChild('videoEl') videoElRef?: ElementRef<HTMLVideoElement>;
+  readonly detail = signal<RecordingDetailResponse | null>(null);
+  readonly transcriptSegments = signal<TranscriptSegment[]>([]);
+  readonly isLoading = signal(false);
+  readonly isTranscriptLoading = signal(false);
+  readonly errorMessage = signal<string | null>(null);
+  readonly transcriptError = signal<string | null>(null);
+  readonly hasNextTranscript = signal(false);
+  readonly nextTranscriptCursor = signal<string | null>(null);
+  readonly activeTab = signal<'summary' | 'aichat'>('summary');
+  readonly sidebarOpen = signal(true);
+  readonly isStarred = signal(false);
+  readonly isPlaying = signal(false);
+  readonly currentTimeSeconds = signal(0);
+  readonly videoDurationSeconds = signal(0);
+  readonly toastMessage = signal<string | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-  chatSuggestions = [
-    'summary.💡 List 3 core points and their supporting arguments',
-    'summary.🔑 List 5 keywords and explain their meanings',
-    'summary.📌 Extract 5 key points',
-    'summary.📋 List 5 technical terms and explain them in simple language',
-    'summary.📋 Extract the outline',
-  ];
-
-  transcriptLines: TranscriptLine[] = [
-    { time: '0:01', text: 'Video of a video meeting interface being navigated...' },
-    { time: '0:05', text: 'Demonstrating the clip recording features in VideoConnect Enterprise dashboard.' },
-  ];
-
-  timelineEvents = [
-    { time: '0:01', event: 'Initial interface tour' },
-    { time: '0:05', event: 'Recording feature demo' },
-    { time: '0:08', event: 'Summary of capabilities' },
-  ];
-
-  // Derived recording display fields
-  recording = computed(() => {
-    const r = this.recordingData();
-    if (!r) return null;
-    // Normalize datetime: add Z if no timezone suffix
-    const normalizeDate = (d: string) =>
-      d.endsWith('Z') || d.includes('+') ? d : d + 'Z';
-    return {
-      egressId: r.egressId,
-      meetingCode: r.meetingCode,
-      title: r.recordingName,
-      creator: r.hostName,
-      hostAvatar: r.hostAvatar,
-      createdAt: this.formatRelativeTime(r.createdAt),
-      createdAtFull: new Date(normalizeDate(r.createdAt)).toLocaleString('vi-VN'),
-      status: r.status,
-      statusLabel: this.getStatusLabel(r.status),
-      visibility: r.visibility,
-      visibilityLabel: this.getVisibilityLabel(r.visibility),
-      visibilityIcon: this.getVisibilityIcon(r.visibility),
-      shareToken: r.shareToken ?? null,
-      fileUrl: r.fileUrl,
-      duration: this.formatDuration(r.duration),
-      durationSeconds: r.duration,
-      currentTime: '0:00',
-    };
+  readonly transcriptLanguage = computed(() => this.detail()?.transcript.language || this.detail()?.ai.sourceLanguage || 'vi');
+  readonly progressPct = computed(() => {
+    const duration = this.videoDurationSeconds() || this.detail()?.metadata.durationSeconds || 0;
+    return duration > 0 ? Math.min(100, (this.currentTimeSeconds() / duration) * 100) : 0;
   });
 
-  ngOnInit() {
-    const egressId = this.route.snapshot.paramMap.get('id') || '';
-    const meetingCode = this.route.snapshot.queryParamMap.get('meetingCode') || '';
-
-    if (egressId && meetingCode) {
-      this.loadRecording(meetingCode, egressId);
+  ngOnInit(): void {
+    const recordingId = Number(this.route.snapshot.paramMap.get('id'));
+    if (!Number.isInteger(recordingId) || recordingId <= 0) {
+      this.errorMessage.set('Đường dẫn bản ghi không hợp lệ.');
+      return;
     }
+    this.loadDetail(recordingId);
   }
 
-  private loadRecording(meetingCode: string, egressId: string): void {
+  private loadDetail(recordingId: number): void {
     this.isLoading.set(true);
     this.errorMessage.set(null);
-    this.recordingService.getRecordings(meetingCode).subscribe({
-      next: (list) => {
-        const found = list.find(r => r.egressId === egressId) || null;
-        if (!found) {
-          this.errorMessage.set('Không tìm thấy bản ghi này.');
-        } else {
-          this.recordingData.set(found);
-        }
+    this.recordingService.getRecordingDetail(recordingId).subscribe({
+      next: detail => {
+        this.detail.set(detail);
         this.isLoading.set(false);
+        if (detail.transcript.status === 'READY') this.loadTranscriptPage();
       },
-      error: (err) => {
-        console.error('Failed to load recording detail:', err);
+      error: error => {
+        console.error('Failed to load recording detail:', error);
         this.errorMessage.set('Không thể tải bản ghi. Vui lòng thử lại.');
         this.isLoading.set(false);
       }
     });
   }
 
-  private formatDuration(seconds: number): string {
-    if (!seconds || seconds === 0) return '0:00';
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-    return `${m}:${String(s).padStart(2, '0')}`;
+  loadTranscriptPage(): void {
+    const detail = this.detail();
+    if (!detail || this.isTranscriptLoading() || !detail.transcript.language) return;
+    this.isTranscriptLoading.set(true);
+    this.transcriptError.set(null);
+    this.recordingService.getTranscriptSegments(detail.id, detail.transcript.language, this.nextTranscriptCursor()).subscribe({
+      next: page => {
+        this.transcriptSegments.update(items => [...items, ...page.items]);
+        this.nextTranscriptCursor.set(page.nextCursor);
+        this.hasNextTranscript.set(page.hasNext);
+        this.isTranscriptLoading.set(false);
+      },
+      error: error => {
+        console.error('Failed to load transcript:', error);
+        this.transcriptError.set('Không thể tải transcript. Vui lòng thử lại.');
+        this.isTranscriptLoading.set(false);
+      }
+    });
   }
 
-  private formatRelativeTime(isoDate: string): string {
-    if (!isoDate) return '';
-    // Normalize: add Z if no timezone info so Date parses as UTC
-    const normalized = isoDate.endsWith('Z') || isoDate.includes('+') ? isoDate : isoDate + 'Z';
-    const diff = Date.now() - new Date(normalized).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Vừa xong';
-    if (mins < 60) return `${mins} phút trước`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} giờ trước`;
-    const days = Math.floor(hours / 24);
-    return `${days} ngày trước`;
+  togglePlay(): void {
+    const video = this.videoElRef?.nativeElement;
+    if (!video) return;
+    if (video.paused) video.play().catch(() => this.showToast('Không thể phát video này.'));
+    else video.pause();
   }
 
-  private getStatusLabel(status: string): string {
-    const map: Record<string, string> = {
-      STARTING: 'Đang khởi động',
-      RECORDING: 'Đang ghi',
-      COMPLETED: 'Hoàn thành',
-      FAILED: 'Lỗi'
-    };
-    return map[status] || status;
+  seekRelative(seconds: number): void {
+    const video = this.videoElRef?.nativeElement;
+    if (video) video.currentTime = Math.max(0, Math.min(video.currentTime + seconds, video.duration || 0));
   }
 
-  private getVisibilityLabel(visibility: string): string {
-    const map: Record<string, string> = {
+  seekToMs(milliseconds: number): void {
+    const video = this.videoElRef?.nativeElement;
+    if (!video) return;
+    video.currentTime = Math.max(0, milliseconds / 1000);
+    video.play().catch(() => {});
+  }
+
+  onVideoLoaded(): void {
+    const duration = this.videoElRef?.nativeElement.duration;
+    if (duration && Number.isFinite(duration)) this.videoDurationSeconds.set(duration);
+  }
+
+  onVideoTimeUpdate(): void {
+    const currentTime = this.videoElRef?.nativeElement.currentTime;
+    if (currentTime != null) this.currentTimeSeconds.set(currentTime);
+  }
+
+  setTab(tab: 'summary' | 'aichat'): void { this.activeTab.set(tab); }
+  toggleSidebar(): void { this.sidebarOpen.update(value => !value); }
+  toggleStar(): void { this.isStarred.update(value => !value); }
+  goBack(): void { this.router.navigate(['/recordings']); }
+
+  copyShareLink(): void {
+    navigator.clipboard.writeText(window.location.href)
+      .then(() => this.showToast('Đã sao chép link chia sẻ.'));
+  }
+
+  copyTranscript(): void {
+    const text = this.transcriptSegments().map(s => `[${this.formatTimestamp(s.startMs)}] ${s.text}`).join('\n');
+    if (text) navigator.clipboard.writeText(text).then(() => this.showToast('Đã sao chép transcript.'));
+  }
+
+  copyLine(text: string, event: Event): void {
+    event.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => this.showToast('Đã sao chép.'));
+  }
+
+  showTranscriptUnavailable(): void {
+    this.showToast('Nút dịch transcript sẽ được kết nối với dịch vụ AI ở giai đoạn tiếp theo.');
+  }
+
+  formatTimestamp(milliseconds: number): string {
+    const total = Math.max(0, Math.floor(milliseconds / 1000));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}` : `${minutes}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  formatDuration(seconds: number | null): string { return this.formatTimestamp((seconds || 0) * 1000); }
+
+  formatRelativeTime(date: string): string {
+    const normalized = date.endsWith('Z') || date.includes('+') ? date : `${date}Z`;
+    const minutes = Math.floor((Date.now() - new Date(normalized).getTime()) / 60000);
+    if (minutes < 1) return 'Vừa xong';
+    if (minutes < 60) return `${minutes} phút trước`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)} giờ trước`;
+    return `${Math.floor(minutes / 1440)} ngày trước`;
+  }
+
+  formatFullDate(date: string): string {
+    const normalized = date.endsWith('Z') || date.includes('+') ? date : `${date}Z`;
+    return new Date(normalized).toLocaleString('vi-VN');
+  }
+
+  statusLabel(status: AiContentStatus): string {
+    return { NOT_REQUESTED: 'Chưa tạo', REQUESTED: 'Đang chờ', PROCESSING: 'Đang xử lý', READY: 'Sẵn sàng', FAILED: 'Không thể tạo' }[status];
+  }
+
+  visibilityLabel(visibility: RecordingDetailResponse['visibility']): string {
+    return {
       PRIVATE: 'Riêng tư',
       MEETING_MEMBERS: 'Thành viên cuộc họp',
-      LINK_ONLY: 'Qua liên kết',
-      PUBLIC: 'Công khai'
-    };
-    return map[visibility] || visibility;
+      LINK_ONLY: 'Ai có liên kết',
+      SELECTED_USERS: 'Chia sẻ chọn lọc'
+    }[visibility];
   }
 
-  private getVisibilityIcon(visibility: string): string {
-    const map: Record<string, string> = {
-      PRIVATE: 'lock',
-      MEETING_MEMBERS: 'group',
-      LINK_ONLY: 'link',
-      PUBLIC: 'public'
-    };
-    return map[visibility] || 'lock';
+  visibilityIcon(visibility: RecordingDetailResponse['visibility']): string {
+    return visibility === 'PRIVATE' ? 'lock' : visibility === 'LINK_ONLY' ? 'link' : visibility === 'SELECTED_USERS' ? 'person' : 'groups';
   }
 
-  togglePlay() { this.isPlaying.update(v => !v); }
-  toggleStar() { this.isStarred.update(v => !v); }
-
-  setTab(tab: 'summary' | 'aichat') { this.activeTab.set(tab); }
-
-  sendSuggestion(text: string) {
-    this.chatInput = text;
-    this.sendChat(null);
-  }
-
-  sendChat(event: Event | null) {
-    if (event instanceof KeyboardEvent && (event as KeyboardEvent).shiftKey) return;
-    event?.preventDefault?.();
-    const msg = this.chatInput.trim();
-    if (!msg) return;
-    this.chatMessages.update(msgs => [...msgs, { role: 'user', text: msg }]);
-    this.chatInput = '';
-    // Simulated AI response
-    setTimeout(() => {
-      this.chatMessages.update(msgs => [
-        ...msgs,
-        { role: 'ai', text: 'I\'m analyzing the recording content. This feature will be connected to the AI backend.' }
-      ]);
-    }, 800);
-  }
-
-  // ── Clipboard ───────────────────────────────────────────────────────────
-  copyLine(text: string) {
-    navigator.clipboard.writeText(text).then(() => this.showToast());
-  }
-
-  copyAllTranscript() {
-    const full = this.transcriptLines
-      .map(l => `[${l.time}] ${l.text}`)
-      .join('\n');
-    navigator.clipboard.writeText(full).then(() => this.showToast());
-  }
-
-  copyShareLink() {
-    const r = this.recordingData();
-    if (!r) return;
-    if (r.shareToken) {
-      const link = `${window.location.origin}/share/${r.shareToken}`;
-      navigator.clipboard.writeText(link).then(() => this.showToast());
-    } else if (r.fileUrl) {
-      navigator.clipboard.writeText(r.fileUrl).then(() => this.showToast());
-    }
-  }
-
-  private showToast() {
-    this.copyToastVisible.set(true);
+  private showToast(message: string): void {
+    this.toastMessage.set(message);
     if (this.toastTimer) clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => this.copyToastVisible.set(false), 2000);
-  }
-
-  goBack() {
-    const r = this.recordingData();
-    if (r) {
-      this.router.navigate(['/recordings'], { queryParams: { meetingCode: r.meetingCode } });
-    } else {
-      this.router.navigate(['/recordings']);
-    }
+    this.toastTimer = setTimeout(() => this.toastMessage.set(null), 2800);
   }
 }

@@ -2,7 +2,11 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { RecordingResponse } from '../models/recording.model';
+import {
+  RecordingDetailResponse,
+  RecordingResponse,
+  TranscriptSegmentPageResponse
+} from '../models/recording.model';
 
 @Injectable({ providedIn: 'root' })
 export class RecordingService {
@@ -42,15 +46,43 @@ export class RecordingService {
     );
   }
 
+  getRecordingDetail(recordingId: number): Observable<RecordingDetailResponse> {
+    return this.http.get<RecordingDetailResponse>(
+      `${this.base}/api/v1/recordings/${recordingId}`
+    ).pipe(
+      map(detail => ({
+        ...detail,
+        metadata: {
+          ...detail.metadata,
+          videoUrl: this.mapFileUrl(detail.metadata.videoUrl)
+        }
+      }))
+    );
+  }
+
+  getTranscriptSegments(
+    recordingId: number,
+    language: string,
+    cursor?: string | null,
+    limit = 100
+  ): Observable<TranscriptSegmentPageResponse> {
+    const params: Record<string, string> = { language, limit: String(limit) };
+    if (cursor) params['cursor'] = cursor;
+    return this.http.get<TranscriptSegmentPageResponse>(
+      `${this.base}/api/v1/recordings/${recordingId}/transcript`,
+      { params }
+    );
+  }
+
   private mapRecording(rec: RecordingResponse): RecordingResponse {
-    if (rec && rec.fileUrl) {
-      // Replace internal docker network hostname 'minio' with 'localhost' for client access
-      rec.fileUrl = rec.fileUrl.replace('://minio:', '://localhost:');
-    }
-    return rec;
+    return { ...rec, fileUrl: this.mapFileUrl(rec.fileUrl) };
   }
 
   private mapRecordings(recs: RecordingResponse[]): RecordingResponse[] {
     return (recs || []).map(r => this.mapRecording(r));
+  }
+
+  private mapFileUrl(url: string | null): string | null {
+    return url ? url.replace('://minio:', '://localhost:') : null;
   }
 }

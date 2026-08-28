@@ -66,9 +66,11 @@ export class RecordingsComponent implements OnInit {
   }
 
   openRecording(recording: RecordingResponse) {
-    this.router.navigate(['/recordings', recording.egressId], {
-      queryParams: { meetingCode: recording.meetingCode }
-    });
+    if (!Number.isInteger(recording.id)) {
+      this.errorMessage.set('Backend chưa trả về mã bản ghi. Hãy restart backend để nhận API recording mới.');
+      return;
+    }
+    this.router.navigate(['/recordings', recording.id]);
   }
 
   setViewMode(mode: 'grid' | 'list') {
