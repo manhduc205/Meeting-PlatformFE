@@ -7,5 +7,7 @@ export const environment = {
   },
   backendApiUrl: 'https://api.videoconnect.click',
   livekitUrl: 'wss://livekit.videoconnect.click', // wss qua port 443 do Nginx proxy vào LiveKit
-  googleClientId: '31196052853-qokps763iu3glinq4sviht7q58n87bv7.apps.googleusercontent.com'
+  googleClientId: '31196052853-qokps763iu3glinq4sviht7q58n87bv7.apps.googleusercontent.com',
+  // Production: backend trả về URL public đúng → không cần rewrite, để rỗng.
+  mediaBaseUrl: '',
 };

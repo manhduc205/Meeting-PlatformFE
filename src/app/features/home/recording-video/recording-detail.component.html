@@ -55,33 +55,85 @@
       </header>
 
       <div class="rd-body-scroll">
-        <section class="rd-player">
-          <video *ngIf="recording.status === 'COMPLETED' && recording.metadata.videoUrl" class="rd-player-video" [src]="recording.metadata.videoUrl" preload="metadata" playsinline #videoEl
-            (loadedmetadata)="onVideoLoaded()" (timeupdate)="onVideoTimeUpdate()" (play)="isPlaying.set(true)" (pause)="isPlaying.set(false)"></video>
+        <section class="rd-player" [class.theater]="isTheaterMode()"
+          (mousemove)="onPlayerMouseMove()" (mouseleave)="onPlayerMouseLeave()">
+          <video *ngIf="recording.status === 'COMPLETED' && recording.metadata.videoUrl"
+            class="rd-player-video" [src]="recording.metadata.videoUrl"
+            preload="metadata" playsinline #videoEl
+            (loadedmetadata)="onVideoLoaded()"
+            (timeupdate)="onVideoTimeUpdate()"
+            (play)="isPlaying.set(true)"
+            (pause)="isPlaying.set(false); isControlsVisible.set(true)"
+            (click)="togglePlay()">
+          </video>
           <div class="rd-player-bg" *ngIf="!(recording.status === 'COMPLETED' && recording.metadata.videoUrl)"></div>
 
-          <div class="rd-player-overlay">
+          <div class="rd-player-overlay" [class.controls-visible]="isControlsVisible()">
+            <!-- Status overlay -->
             <div class="rd-player-status" *ngIf="recording.status !== 'COMPLETED' || !recording.metadata.videoUrl">
               <span class="material-symbols-outlined rd-status-icon">{{ recording.status === 'RECORDING' ? 'radio_button_checked' : recording.status === 'FAILED' ? 'error_outline' : 'hourglass_top' }}</span>
               <span class="rd-status-label">{{ recording.status === 'RECORDING' ? 'Đang ghi hình' : recording.status === 'FAILED' ? 'Bản ghi gặp lỗi' : 'Bản ghi đang được xử lý' }}</span>
               <span class="rd-status-sub" *ngIf="recording.status === 'COMPLETED' && !recording.metadata.videoUrl">Video chưa sẵn sàng để phát.</span>
             </div>
-            <button class="rd-play-btn" *ngIf="recording.status === 'COMPLETED' && recording.metadata.videoUrl" (click)="togglePlay()" [attr.aria-label]="isPlaying() ? 'Tạm dừng' : 'Phát video'">
+
+            <!-- Center play/pause button — ẩn khi đang phát và không hover -->
+            <button class="rd-play-btn"
+              *ngIf="recording.status === 'COMPLETED' && recording.metadata.videoUrl"
+              (click)="togglePlay()"
+              [attr.aria-label]="isPlaying() ? 'Tạm dừng' : 'Phát video'">
               <span class="material-symbols-outlined">{{ isPlaying() ? 'pause' : 'play_arrow' }}</span>
             </button>
+
+            <!-- Controls bar -->
             <div class="rd-controls" *ngIf="recording.status === 'COMPLETED' && recording.metadata.videoUrl">
-              <div class="rd-progress"><div class="rd-progress-fill" [style.width.%]="progressPct()"><div class="rd-progress-thumb"></div></div></div>
-              <div class="rd-controls-row">
+              <!-- Progress bar -->
+              <div class="rd-progress" (click)="seekToProgress($event)">
+                <div class="rd-progress-fill" [style.width.%]="progressPct()">
+                  <div class="rd-progress-thumb"></div>
+                </div>
+              </div>
+              <!-- Buttons row -->
+              <div class="rd-controls-row" (click)="$event.stopPropagation()">
                 <div class="rd-controls-left">
-                  <button class="rd-ctrl-btn" (click)="togglePlay()"><span class="material-symbols-outlined">{{ isPlaying() ? 'pause' : 'play_arrow' }}</span></button>
-                  <button class="rd-ctrl-btn" (click)="seekRelative(-10)" title="Lùi 10 giây"><span class="material-symbols-outlined">replay_10</span></button>
-                  <button class="rd-ctrl-btn" (click)="seekRelative(10)" title="Tua 10 giây"><span class="material-symbols-outlined">forward_10</span></button>
-                  <span class="rd-time">{{ formatDuration(currentTimeSeconds()) }} / {{ formatDuration(videoDurationSeconds() || recording.metadata.durationSeconds) }}</span>
+                  <button class="rd-ctrl-btn" (click)="togglePlay()">
+                    <span class="material-symbols-outlined">{{ isPlaying() ? 'pause' : 'play_arrow' }}</span>
+                  </button>
+                  <button class="rd-ctrl-btn" (click)="seekRelative(-10)" title="Lùi 10 giây">
+                    <span class="material-symbols-outlined">replay_10</span>
+                  </button>
+                  <button class="rd-ctrl-btn" (click)="seekRelative(10)" title="Tua 10 giây">
+                    <span class="material-symbols-outlined">forward_10</span>
+                  </button>
+                  <span class="rd-time">
+                    {{ formatDuration(currentTimeSeconds()) }} / {{ formatDuration(videoDurationSeconds() || recording.metadata.durationSeconds) }}
+                  </span>
+                </div>
+                <div class="rd-controls-right">
+                  <!-- Speed picker -->
+                  <div class="rd-speed-wrap">
+                    <button class="rd-speed-btn">{{ playbackSpeed() }}x</button>
+                    <div class="rd-speed-menu">
+                      <button
+                        *ngFor="let s of speeds"
+                        class="rd-speed-option"
+                        [class.active]="playbackSpeed() === s"
+                        (click)="setSpeed(s)">{{ s }}x</button>
+                    </div>
+                  </div>
+                  <!-- Theater mode -->
+                  <button class="rd-ctrl-btn" (click)="toggleTheater()" [title]="isTheaterMode() ? 'Thoát chế độ rạp' : 'Chế độ rạp chiếu phim'">
+                    <span class="material-symbols-outlined">{{ isTheaterMode() ? 'crop_free' : 'theater_comedy' }}</span>
+                  </button>
+                  <!-- Fullscreen -->
+                  <button class="rd-ctrl-btn" (click)="toggleFullscreen()" title="Toàn màn hình">
+                    <span class="material-symbols-outlined">fullscreen</span>
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         </section>
+
 
         <section class="rd-transcript">
           <div class="rd-copy-toast" [class.visible]="toastMessage()">{{ toastMessage() }}</div>

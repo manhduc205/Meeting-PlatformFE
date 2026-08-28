@@ -285,6 +285,21 @@ $t:           0.2s ease;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  cursor: pointer;
+
+  // Khi playing + mouse ra ngoài: ẩn controls (opacity)
+  .rd-play-btn,
+  .rd-controls {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+}
+
+// Theater mode
+.rd-player.theater {
+  aspect-ratio: unset;
+  height: 70vh;
+  border-radius: 0;
+  margin-bottom: 0;
 }
 
 // Status overlay when not completed
@@ -317,6 +332,7 @@ $t:           0.2s ease;
 }
 
 // Center play button
+// Mặc định: hiện khi không phát; ẩn khi đang phát và không có controls-visible
 .rd-play-btn {
   position: absolute;
   top: 50%;
@@ -333,15 +349,31 @@ $t:           0.2s ease;
   justify-content: center;
   color: #fff;
   cursor: pointer;
-  transition: transform $t, background $t;
+  opacity: 1;
+  transition: transform 0.25s ease, background 0.2s ease, opacity 0.3s ease;
+
   &:hover {
     background: rgba(255,255,255,0.25);
-    transform: translate(-50%, -50%) scale(1.05);
+    transform: translate(-50%, -50%) scale(1.08);
   }
+
   .material-symbols-outlined {
     font-size: 44px;
     font-variation-settings: 'FILL' 1;
   }
+}
+
+// Khi overlay KHÔNG có .controls-visible → ẩn play-btn
+.rd-player-overlay:not(.controls-visible) .rd-play-btn {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.85);
+}
+
+// Và ẩn cả controls bar
+.rd-player-overlay:not(.controls-visible) .rd-controls {
+  opacity: 0;
+  pointer-events: none;
 }
 
 // Controls bar
@@ -426,6 +458,45 @@ $t:           0.2s ease;
   cursor: pointer;
   transition: background $t;
   &:hover { background: rgba(255,255,255,0.1); }
+}
+
+// Speed popup menu
+.rd-speed-wrap {
+  position: relative;
+
+  .rd-speed-menu {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    background: rgba(20,20,24,0.96);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    overflow: hidden;
+    min-width: 80px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 10;
+    flex-direction: column;
+  }
+
+  &:hover .rd-speed-menu {
+    display: flex;
+  }
+
+  .rd-speed-option {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.8);
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.15s;
+    &:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    &.active { color: $primary; font-weight: 700; }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════

@@ -2,7 +2,7 @@ import { Component, OnInit, signal, inject, computed, ViewChild, ElementRef } fr
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { RecordingService } from '../../meeting-room/services/recording.service';
-import { AiContentStatus, RecordingDetailResponse, TranscriptSegment } from '../../meeting-room/models/recording.model';
+import { AiContentStatus, RecordingDetailResponse, TranscriptSegment, TranscriptSegmentPageResponse } from '../../meeting-room/models/recording.model';
 
 @Component({
   selector: 'app-recording-detail', standalone: true, imports: [CommonModule, RouterModule],
@@ -29,7 +29,12 @@ export class RecordingDetailComponent implements OnInit {
   readonly currentTimeSeconds = signal(0);
   readonly videoDurationSeconds = signal(0);
   readonly toastMessage = signal<string | null>(null);
+  readonly playbackSpeed = signal(1);
+  readonly isTheaterMode = signal(false);
+  readonly isControlsVisible = signal(true);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
+  private hideControlsTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
   readonly transcriptLanguage = computed(() => this.detail()?.transcript.language || this.detail()?.ai.sourceLanguage || 'vi');
   readonly progressPct = computed(() => {
@@ -50,12 +55,12 @@ export class RecordingDetailComponent implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.recordingService.getRecordingDetail(recordingId).subscribe({
-      next: detail => {
+      next: (detail: RecordingDetailResponse) => {
         this.detail.set(detail);
         this.isLoading.set(false);
         if (detail.transcript.status === 'READY') this.loadTranscriptPage();
       },
-      error: error => {
+      error: (error: unknown) => {
         console.error('Failed to load recording detail:', error);
         this.errorMessage.set('Không thể tải bản ghi. Vui lòng thử lại.');
         this.isLoading.set(false);
@@ -69,13 +74,13 @@ export class RecordingDetailComponent implements OnInit {
     this.isTranscriptLoading.set(true);
     this.transcriptError.set(null);
     this.recordingService.getTranscriptSegments(detail.id, detail.transcript.language, this.nextTranscriptCursor()).subscribe({
-      next: page => {
+      next: (page: TranscriptSegmentPageResponse) => {
         this.transcriptSegments.update(items => [...items, ...page.items]);
         this.nextTranscriptCursor.set(page.nextCursor);
         this.hasNextTranscript.set(page.hasNext);
         this.isTranscriptLoading.set(false);
       },
-      error: error => {
+      error: (error: unknown) => {
         console.error('Failed to load transcript:', error);
         this.transcriptError.set('Không thể tải transcript. Vui lòng thử lại.');
         this.isTranscriptLoading.set(false);
@@ -95,6 +100,15 @@ export class RecordingDetailComponent implements OnInit {
     if (video) video.currentTime = Math.max(0, Math.min(video.currentTime + seconds, video.duration || 0));
   }
 
+  seekToProgress(event: MouseEvent): void {
+    const video = this.videoElRef?.nativeElement;
+    if (!video || !video.duration) return;
+    const bar = event.currentTarget as HTMLElement;
+    const rect = bar.getBoundingClientRect();
+    const fraction = Math.max(0, Math.min((event.clientX - rect.left) / rect.width, 1));
+    video.currentTime = fraction * video.duration;
+  }
+
   seekToMs(milliseconds: number): void {
     const video = this.videoElRef?.nativeElement;
     if (!video) return;
@@ -110,6 +124,36 @@ export class RecordingDetailComponent implements OnInit {
   onVideoTimeUpdate(): void {
     const currentTime = this.videoElRef?.nativeElement.currentTime;
     if (currentTime != null) this.currentTimeSeconds.set(currentTime);
+  }
+
+  setSpeed(speed: number): void {
+    const video = this.videoElRef?.nativeElement;
+    if (video) video.playbackRate = speed;
+    this.playbackSpeed.set(speed);
+  }
+
+  toggleFullscreen(): void {
+    const el = this.videoElRef?.nativeElement?.closest('.rd-player') as HTMLElement | null;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
+  toggleTheater(): void { this.isTheaterMode.update(v => !v); }
+
+  onPlayerMouseMove(): void {
+    this.isControlsVisible.set(true);
+    if (this.hideControlsTimer) clearTimeout(this.hideControlsTimer);
+    if (this.isPlaying()) {
+      this.hideControlsTimer = setTimeout(() => this.isControlsVisible.set(false), 3000);
+    }
+  }
+
+  onPlayerMouseLeave(): void {
+    if (this.isPlaying()) this.isControlsVisible.set(false);
   }
 
   setTab(tab: 'summary' | 'aichat'): void { this.activeTab.set(tab); }
