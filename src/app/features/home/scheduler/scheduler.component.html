@@ -168,6 +168,7 @@
                   *ngIf="meeting.hostAvatar"
                   [src]="meeting.hostAvatar"
                   [alt]="meeting.hostName || ''"
+                  (error)="handleHostAvatarError(meeting)"
                   class="mb-avatar" />
                 <div *ngIf="!meeting.hostAvatar"
                      class="mb-avatar-placeholder"
@@ -355,24 +356,7 @@
     </div>
   </div>
 
-  <div class="detail-hr"></div>
-
-  <!-- Add attachments -->
-  <div class="detail-row detail-row-link">
-    <span class="material-symbols-outlined detail-row-icon">attach_file</span>
-    <a class="detail-link" href="#">Add attachments</a>
-  </div>
-
-  <div class="detail-hr"></div>
-
-  <!-- Create agenda -->
-  <div class="detail-row detail-row-link">
-    <span class="material-symbols-outlined detail-row-icon">description</span>
-    <a class="detail-link" href="#">Create agenda</a>
-    <span class="badge-new">NEW</span>
-  </div>
-
-  <div class="detail-hr"></div>
+  <div class="detail-hr" *ngIf="selectedMeeting()!.description"></div>
 
   <!-- Description -->
   <div class="detail-row detail-row-top" *ngIf="selectedMeeting()!.description">

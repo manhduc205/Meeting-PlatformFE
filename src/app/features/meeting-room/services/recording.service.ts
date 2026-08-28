@@ -20,9 +20,9 @@ export class RecordingService {
 
   stopRecording(meetingCode: string, egressId: string): Observable<void> {
     return this.http.post<void>(
-      `${this.base}/api/v1/recordings/meeting/${meetingCode}/stop`,
+      `${this.base}/api/v1/recordings/meeting/${meetingCode}/stop?egressId=${encodeURIComponent(egressId)}`,
       null,
-      { params: { egressId }, responseType: 'text' as 'json' }
+      { responseType: 'text' as 'json' }
     );
   }
 

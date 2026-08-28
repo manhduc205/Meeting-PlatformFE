@@ -1,11 +1,11 @@
 export const environment = {
-  production: true,
+  production: false,
   keycloak: {
-    url: 'https://auth.videoconnect.click',
+    url: 'http://localhost:8080',
     realm: 'meeting-realm',
     clientId: 'meeting-client'
   },
-  backendApiUrl: 'https://api.videoconnect.click',
-  livekitUrl: 'wss://livekit.videoconnect.click', // wss qua port 443 do Nginx proxy vào LiveKit
+  backendApiUrl: 'http://localhost:8081',
+  livekitUrl: 'ws://localhost:7880',
   googleClientId: '31196052853-qokps763iu3glinq4sviht7q58n87bv7.apps.googleusercontent.com'
 };

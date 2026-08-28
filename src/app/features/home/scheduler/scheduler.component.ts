@@ -105,6 +105,17 @@ export class SchedulerComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
+  /**
+   * Some legacy profile URLs can be expired or inaccessible to the browser.
+   * Remove the failed URL so the calendar consistently falls back to initials
+   * instead of leaving a broken-image icon beside the host's name.
+   */
+  handleHostAvatarError(meeting: ScheduledMeeting) {
+    this.scheduledMeetings.update(meetings => meetings.map(item =>
+      item.id === meeting.id ? { ...item, hostAvatar: undefined } : item
+    ));
+  }
+
   ngAfterViewInit() {
     // Auto-scroll to current time (7 AM if before 7 AM)
     setTimeout(() => {
